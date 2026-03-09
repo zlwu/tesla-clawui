@@ -22,7 +22,7 @@ const configSchema = z.object({
   LLM_BASE_URL: z.string().optional(),
   LLM_API_KEY: z.string().optional(),
   LLM_MODEL: z.string().min(1).default('openai/gpt-4o-mini'),
-  ASR_PROVIDER: z.enum(['mock', 'openai-compatible']).default('mock'),
+  ASR_PROVIDER: z.enum(['mock', 'openai-compatible', 'qwen']).default('mock'),
   ASR_BASE_URL: z.string().optional(),
   ASR_API_KEY: z.string().optional(),
   ASR_MODEL: z.string().min(1).default('whisper-1'),
@@ -40,7 +40,7 @@ export type AppConfig = {
   llmBaseUrl?: string;
   llmApiKey?: string;
   llmModel: string;
-  asrProvider: 'mock' | 'openai-compatible';
+  asrProvider: 'mock' | 'openai-compatible' | 'qwen';
   asrBaseUrl?: string;
   asrApiKey?: string;
   asrModel: string;

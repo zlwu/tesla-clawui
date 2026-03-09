@@ -3,6 +3,7 @@ import type { FastifyBaseLogger } from 'fastify';
 import type { AppConfig } from '../lib/config.js';
 import { MockAsrProvider } from '../providers/asr/mock-provider.js';
 import { OpenAiCompatibleAsrProvider } from '../providers/asr/openai-compatible-provider.js';
+import { QwenAsrProvider } from '../providers/asr/qwen-asr-provider.js';
 import type { AsrProvider } from '../providers/asr/provider.js';
 import { logStepFailure, logStepSuccess } from '../lib/observability.js';
 
@@ -13,7 +14,9 @@ export class AsrService {
     this.provider =
       config.asrProvider === 'openai-compatible'
         ? new OpenAiCompatibleAsrProvider(config)
-        : new MockAsrProvider();
+        : config.asrProvider === 'qwen'
+          ? new QwenAsrProvider(config)
+          : new MockAsrProvider();
   }
 
   public async transcribe(params: {

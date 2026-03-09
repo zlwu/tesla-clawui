@@ -1,6 +1,9 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import multipart from '@fastify/multipart';
+import fastifyStatic from '@fastify/static';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { createDb } from './db/client.js';
 import { loadConfig } from './lib/config.js';
@@ -33,6 +36,10 @@ declare module 'fastify' {
 
 const hasIssues = (error: unknown): error is { issues: unknown } =>
   typeof error === 'object' && error !== null && 'issues' in error;
+
+const currentDir = dirname(fileURLToPath(import.meta.url));
+const workspaceRoot = resolve(currentDir, '../..');
+const webDistDir = resolve(workspaceRoot, 'web/dist');
 
 export const createApp = () => {
   const config = loadConfig();
@@ -112,11 +119,34 @@ export const createApp = () => {
       fileSize: 10 * 1024 * 1024,
     },
   });
+  void app.register(fastifyStatic, {
+    root: webDistDir,
+    prefix: '/',
+    decorateReply: false,
+  });
   void app.register(healthRoutes);
   void app.register(sessionRoutes);
   void app.register(textRoutes);
   void app.register(voiceRoutes);
   void app.register(messagesRoutes);
+  app.setNotFoundHandler(async (request, reply) => {
+    if (
+      (request.method === 'GET' || request.method === 'HEAD') &&
+      !request.url.startsWith('/api/')
+    ) {
+      await reply.sendFile('index.html');
+      return;
+    }
+
+    reply.status(404).send({
+      ok: false,
+      error: {
+        code: 'NOT_FOUND',
+        message: '资源不存在',
+        retryable: false,
+      },
+    });
+  });
 
   return { app, config };
 };

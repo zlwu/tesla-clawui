@@ -12,7 +12,10 @@
 
 ## 当前状态
 
-- 本地浏览器验证已通过：页面加载、文本发送、刷新恢复、弱网手动重试
+- 本地浏览器验证已通过：页面加载、文本发送、语音录音、刷新恢复、弱网手动重试
+- 真实 provider 联调已通过：`Qwen ASR + OpenRouter LLM`
+- 开发态与生产态都已验证可由 Fastify 单服务统一托管页面与 API
+- 本地接手校验已通过：`npm run lint`、`npm run typecheck`、`npm test`、`npm run build`
 - Tesla 真机验证还没做完
 - 当前状态汇总见 `docs/tesla-openclaw-current-status.md`
 
@@ -24,8 +27,9 @@
 
 ## 开发命令
 
-- `npm run dev:server`：启动 Fastify API
-- `npm run dev:web`：启动 Vite 前端
+- `npm run dev`：统一启动开发环境；Fastify 对外提供页面与 API，前端仅做构建 watch
+- `npm run dev:server`：单独启动 Fastify 服务
+- `npm run dev:web`：仅执行前端静态产物 watch
 - `npm run build`：构建 shared、server、web
 - `npm run lint`：执行 ESLint
 - `npm run typecheck`：执行 TypeScript 严格检查
@@ -35,16 +39,15 @@
 
 - 服务端配置放在项目根目录 `.env`
 - 示例配置见 `.env.example`
-- 前端默认通过 Vite 代理访问 `/api`
+- 默认同源访问 `/api`
 - 如果前端需要直连其他 API 域名，可设置 `VITE_API_BASE_URL`
 
 ## 运行步骤
 
 1. 在项目根准备 `.env`
 2. 执行 `npm install`
-3. 执行 `npm run dev:server`
-4. 执行 `npm run dev:web`
-5. 打开 Vite 提示的本地地址
+3. 执行 `npm run dev`
+4. 打开 `http://127.0.0.1:3000`
 
 ## 冒烟清单
 
@@ -55,9 +58,11 @@
 5. 断网后出现可解释错误，恢复网络后可点“重试上一步”
 6. 相同 `requestId` 不会重复生成多份回复
 
+真机实测请直接使用 `docs/tesla-openclaw-smoke-checklist.md`。
+
 ## 已知边界
 
-- 默认使用 `mock` ASR 和 `mock` LLM，优先保证链路稳定
+- 真实 `ASR + LLM` 本地已验证通过，但 Tesla 真机兼容性仍未完成
 - TTS、手机端协同、SSE、WebSocket 都不在 MVP
 - Tesla 真机兼容性仍需按 `docs/tesla-openclaw-mvp-validation-plan.md` 实测
 - `cloudflared`/临时公网隧道只用于测试，不属于正式产品方案

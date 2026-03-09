@@ -1,5 +1,5 @@
 import type { Message, MessageRole, MessageSource } from '@tesla-openclaw/shared';
-import { asc, eq } from 'drizzle-orm';
+import { asc, desc, eq } from 'drizzle-orm';
 
 import type { DatabaseClient } from '../db/client.js';
 import { messages } from '../db/schema.js';
@@ -31,11 +31,11 @@ export class MessageService {
   public async listHistory(sessionId: string, limit: number): Promise<Message[]> {
     const rows = await this.db.query.messages.findMany({
       where: eq(messages.sessionId, sessionId),
-      orderBy: [asc(messages.createdAt)],
+      orderBy: [desc(messages.createdAt)],
       limit,
     });
 
-    return rows.map(toMessage);
+    return rows.reverse().map(toMessage);
   }
 
   public async create(params: {

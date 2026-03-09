@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 
 import { createApp } from '../app.js';
 
-const testDbPath = resolve(process.cwd(), 'server/data/test-openclaw.db');
+const testDbPath = resolve(process.cwd(), 'server/data/test-openclaw-api.db');
 
 const createRequestId = (prefix: string): string =>
   `${prefix}_${Date.now()}_${Math.random().toString(16).slice(2, 10)}`;
@@ -13,7 +13,7 @@ const createRequestId = (prefix: string): string =>
 describe('server api', () => {
   beforeEach(() => {
     rmSync(testDbPath, { force: true });
-    process.env.DATABASE_URL = './server/data/test-openclaw.db';
+    process.env.DATABASE_URL = './server/data/test-openclaw-api.db';
     process.env.LLM_PROVIDER = 'mock';
     process.env.ASR_PROVIDER = 'mock';
   });
@@ -110,6 +110,46 @@ describe('server api', () => {
 
     const messages = await app.services.messageService.listRecent(createPayload.data.session.sessionId, 8);
     expect(messages).toHaveLength(2);
+
+    await app.close();
+  });
+
+  it('keeps the latest conversation turns in LLM context', async () => {
+    const { app } = createApp();
+
+    const createResponse = await app.inject({
+      method: 'POST',
+      url: '/api/session/create',
+      payload: {
+        device: { type: 'tesla-browser', label: 'tesla-mcu2' },
+      },
+    });
+    const createPayload = createResponse.json<{ data: { session: { sessionId: string }; sessionToken: string } }>();
+
+    for (let round = 1; round <= 8; round += 1) {
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/text/input',
+        headers: {
+          authorization: `Bearer ${createPayload.data.sessionToken}`,
+        },
+        payload: {
+          sessionId: createPayload.data.session.sessionId,
+          text: `第 ${round} 轮`,
+          requestId: createRequestId('req_text'),
+        },
+      });
+
+      expect(response.statusCode).toBe(200);
+    }
+
+    const history = await app.services.messageService.listHistory(createPayload.data.session.sessionId, 12);
+
+    expect(history).toHaveLength(12);
+    expect(history[0]?.role).toBe('user');
+    expect(history[0]?.content).toBe('第 3 轮');
+    expect(history.at(-2)?.role).toBe('user');
+    expect(history.at(-2)?.content).toBe('第 8 轮');
 
     await app.close();
   });

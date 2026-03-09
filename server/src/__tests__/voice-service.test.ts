@@ -5,14 +5,14 @@ import { beforeEach, describe, expect, it } from 'vitest';
 
 import { createApp } from '../app.js';
 
-const testDbPath = resolve(process.cwd(), 'server/data/test-openclaw.db');
+const testDbPath = resolve(process.cwd(), 'server/data/test-openclaw-voice.db');
 
 const createRequestId = (): string => `req_voice_${Date.now()}_${Math.random().toString(16).slice(2, 10)}`;
 
 describe('voice service', () => {
   beforeEach(() => {
     rmSync(testDbPath, { force: true });
-    process.env.DATABASE_URL = './server/data/test-openclaw.db';
+    process.env.DATABASE_URL = './server/data/test-openclaw-voice.db';
     process.env.LLM_PROVIDER = 'mock';
     process.env.ASR_PROVIDER = 'mock';
   });
