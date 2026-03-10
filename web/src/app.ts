@@ -23,6 +23,8 @@ export class TeslaOpenClawApp {
   private readonly voiceRecorder = new VoiceRecorder();
   private progressTimerIds: number[] = [];
   private lastRenderSignature: string | null = null;
+  private keyboardMode = false;
+  private lastButtonAction: { id: string; at: number } | null = null;
 
   public constructor(private readonly root: HTMLElement) {}
 
@@ -36,26 +38,62 @@ export class TeslaOpenClawApp {
   }
 
   private bindEvents(): void {
-    this.root.addEventListener('click', (event) => {
+    const handleButtonAction = (event: Event, options: { early: boolean }) => {
       const target = event.target;
-      if (!(target instanceof HTMLElement)) {
+      if (!(target instanceof Element)) {
         return;
       }
 
-      if (target.id === 'send-button') {
+      const button = target.closest('button');
+      if (!(button instanceof HTMLButtonElement)) {
+        return;
+      }
+
+       if (button.disabled) {
+        return;
+      }
+
+      const now = Date.now();
+      if (
+        !options.early &&
+        this.lastButtonAction &&
+        this.lastButtonAction.id === button.id &&
+        now - this.lastButtonAction.at < 350
+      ) {
+        return;
+      }
+
+      if (options.early) {
+        event.preventDefault();
+        this.lastButtonAction = { id: button.id, at: now };
+      }
+
+      if (button.id === 'send-button') {
         void this.handleSend();
         return;
       }
 
-      if (target.id === 'recover-button') {
+      if (button.id === 'recover-button') {
         void this.handleRecoveryAction();
         return;
       }
 
-      if (target.id === 'voice-button') {
+      if (button.id === 'voice-button') {
         void this.handleVoiceAction();
       }
-    }, { passive: true });
+    };
+
+    this.root.addEventListener('pointerdown', (event) => {
+      handleButtonAction(event, { early: true });
+    });
+
+    this.root.addEventListener('mousedown', (event) => {
+      handleButtonAction(event, { early: true });
+    });
+
+    this.root.addEventListener('click', (event) => {
+      handleButtonAction(event, { early: false });
+    });
 
     this.root.addEventListener('input', (event) => {
       const target = event.target;
@@ -64,6 +102,8 @@ export class TeslaOpenClawApp {
       }
 
       this.state.draftText = target.value;
+      this.syncComposerInputHeight();
+      this.syncComposerDraftState();
     });
 
     window.addEventListener('online', () => {
@@ -74,6 +114,38 @@ export class TeslaOpenClawApp {
     window.addEventListener('offline', () => {
       this.state.networkOnline = false;
       this.render();
+    });
+
+    this.root.addEventListener('focusin', (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLTextAreaElement) || target.id !== 'text-input') {
+        return;
+      }
+
+      this.keyboardMode = true;
+      this.syncKeyboardViewport();
+      window.setTimeout(() => {
+        this.scrollComposerIntoView();
+      }, 120);
+    });
+
+    this.root.addEventListener('focusout', (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLTextAreaElement) || target.id !== 'text-input') {
+        return;
+      }
+
+      this.keyboardMode = false;
+      this.syncKeyboardViewport();
+    });
+
+    window.visualViewport?.addEventListener('resize', () => {
+      if (!this.keyboardMode) {
+        return;
+      }
+
+      this.syncKeyboardViewport();
+      this.scrollComposerIntoView();
     });
   }
 
@@ -94,6 +166,10 @@ export class TeslaOpenClawApp {
     if (messagesNode) {
       messagesNode.scrollTop = messagesNode.scrollHeight;
     }
+
+    this.syncComposerInputHeight();
+
+    this.syncKeyboardViewport();
   }
 
   private setStatus(next: AppStatus): void {
@@ -102,6 +178,48 @@ export class TeslaOpenClawApp {
 
   private readNetworkOnline(): boolean {
     return typeof navigator === 'undefined' ? true : navigator.onLine;
+  }
+
+  private syncKeyboardViewport(): void {
+    const visualViewport = window.visualViewport;
+    const keyboardOffset =
+      this.keyboardMode && visualViewport
+        ? Math.max(window.innerHeight - visualViewport.height - visualViewport.offsetTop, 0)
+        : 0;
+
+    this.root.style.setProperty('--keyboard-offset', `${keyboardOffset}px`);
+    this.root.classList.toggle('keyboard-active', this.keyboardMode || keyboardOffset > 0);
+  }
+
+  private scrollComposerIntoView(): void {
+    const composer = this.root.querySelector<HTMLElement>('.composer');
+    composer?.scrollIntoView({ block: 'nearest' });
+  }
+
+  private syncComposerInputHeight(): void {
+    const input = this.root.querySelector<HTMLTextAreaElement>('#text-input');
+    if (!input) {
+      return;
+    }
+
+    input.style.height = '0px';
+    input.style.height = `${Math.min(input.scrollHeight, 168)}px`;
+  }
+
+  private syncComposerDraftState(): void {
+    const sendButton = this.root.querySelector<HTMLButtonElement>('#send-button');
+    if (!sendButton) {
+      return;
+    }
+
+    const hasDraftText = this.state.draftText.trim().length > 0;
+    sendButton.classList.toggle('send-icon-button-hidden', !hasDraftText);
+    sendButton.disabled =
+      !hasDraftText
+      || this.state.isSendingText
+      || this.state.status === 'recording'
+      || isVoiceBusyStatus(this.state.status)
+      || !this.state.sessionId;
   }
 
   private setErrorState(message: string, retryAction: RetryAction | null, errorCode: AppErrorCode): void {
@@ -262,8 +380,9 @@ export class TeslaOpenClawApp {
       this.state.retryAction = null;
       this.setStatus('recording');
       this.render();
-    } catch {
-      this.setErrorState('无法开始录音，请检查麦克风权限', null, 'MIC_REQUIRED');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '无法开始录音，请检查麦克风权限';
+      this.setErrorState(message, null, 'MIC_REQUIRED');
       this.render();
     }
   }

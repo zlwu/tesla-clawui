@@ -16,8 +16,12 @@
 - 真实 provider 联调已通过：`Qwen ASR + OpenRouter LLM`
 - 开发态与生产态都已验证可由 Fastify 单服务统一托管页面与 API
 - 本地接手校验已通过：`npm run lint`、`npm run typecheck`、`npm test`、`npm run build`
-- Tesla 真机验证还没做完
+- Tesla 真机主链路验证已通过，当前结论为 `Proceed with Caveats`
 - 当前状态汇总见 `docs/tesla-openclaw-current-status.md`
+- 当前真机 UI 重写设计见 `docs/tesla-openclaw-client-ui-design.md`
+- Tesla 真机主输入路径已调整为：系统语音输入法 / 长按系统语音键输入 -> 文本框 -> 发送
+- 当前输入区已收口为：单一 composer、右侧发送按钮、次级麦克风工具位
+- 当前已知真机瑕疵：输入框仍会被输入面板部分遮挡
 
 ## 目录
 

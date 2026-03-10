@@ -32,7 +32,8 @@ describe('renderApp', () => {
     renderApp(root, state);
 
     expect(root.querySelector('#voice-button')).not.toBeNull();
-    expect(root.textContent).toContain('按一下开始说话');
+    expect(root.querySelector('.composer-tools #voice-button')).not.toBeNull();
+    expect(root.querySelector<HTMLTextAreaElement>('#text-input')?.placeholder).toContain('系统语音输入');
   });
 
   it('renders draft text and recover button in error state', () => {
@@ -50,5 +51,34 @@ describe('renderApp', () => {
     expect(root.textContent).toContain('重试上一步');
     expect(root.textContent).toContain('网络离线');
     expect(root.querySelector<HTMLTextAreaElement>('#text-input')?.value).toBe('保留中的文本');
+  });
+
+  it('shows keyboard dictation hint when voice recording is unavailable', () => {
+    const root = document.createElement('div');
+    const state = createInitialState();
+    state.voiceSupported = false;
+
+    renderApp(root, state);
+
+    expect(root.querySelector<HTMLTextAreaElement>('#text-input')?.placeholder).toContain('Tesla 真机可使用系统语音输入');
+  });
+
+  it('places the send button next to the text input when draft exists', () => {
+    const root = document.createElement('div');
+    const state = createInitialState();
+    state.draftText = '你好';
+
+    renderApp(root, state);
+
+    expect(root.querySelector('.composer-row #send-button')).not.toBeNull();
+  });
+
+  it('hides the send button when draft is empty', () => {
+    const root = document.createElement('div');
+    const state = createInitialState();
+
+    renderApp(root, state);
+
+    expect(root.querySelector('#send-button')?.className).toContain('send-icon-button-hidden');
   });
 });

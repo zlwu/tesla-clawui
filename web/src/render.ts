@@ -16,6 +16,11 @@ const voiceButtonLabel = (state: AppState): string => {
   return '按一下开始说话';
 };
 
+const voiceHintText = (state: AppState): string =>
+  state.voiceSupported
+    ? '给 OpenClaw 发消息，也可使用系统语音输入后发送'
+    : '给 OpenClaw 发消息，Tesla 真机可使用系统语音输入';
+
 const actionButtonLabel = (state: AppState): string => {
   if (state.retryAction) {
     return '重试上一步';
@@ -24,13 +29,30 @@ const actionButtonLabel = (state: AppState): string => {
   return '恢复继续';
 };
 
+const sendIcon = () => `
+  <svg viewBox="0 0 20 20" aria-hidden="true" class="button-icon">
+    <path d="M4 10.2 15.4 4.8c.8-.4 1.6.4 1.2 1.2L11.2 17.4c-.3.7-1.3.7-1.6 0l-1.7-4-4-1.7c-.7-.3-.7-1.3.1-1.5Z" fill="currentColor"/>
+  </svg>
+`;
+
+const micIcon = () => `
+  <svg viewBox="0 0 20 20" aria-hidden="true" class="button-icon">
+    <path d="M10 13.8a3.6 3.6 0 0 0 3.6-3.6V6a3.6 3.6 0 1 0-7.2 0v4.2A3.6 3.6 0 0 0 10 13.8Zm5-3.9a.9.9 0 1 1 1.8 0 6.8 6.8 0 0 1-5.9 6.7v1.6h2.1a.9.9 0 1 1 0 1.8H7a.9.9 0 0 1 0-1.8h2.1v-1.6a6.8 6.8 0 0 1-5.9-6.7.9.9 0 0 1 1.8 0 5 5 0 1 0 10 0Z" fill="currentColor"/>
+  </svg>
+`;
+
 export const renderApp = (root: HTMLElement, state: AppState): void => {
   const messageItems = state.messages
     .map(
       (message) => `
         <article class="${messageClassName(message.role)}">
-          <div class="message-role">${message.role === 'assistant' ? 'OpenClaw' : '你'}</div>
-          <p class="message-content">${escapeHtml(message.content)}</p>
+          <div class="message-shell">
+            <div class="message-avatar">${message.role === 'assistant' ? 'OC' : '你'}</div>
+            <div class="message-body">
+              <div class="message-role">${message.role === 'assistant' ? 'OpenClaw' : '你'}</div>
+              <p class="message-content">${escapeHtml(message.content)}</p>
+            </div>
+          </div>
         </article>
       `,
     )
@@ -38,6 +60,7 @@ export const renderApp = (root: HTMLElement, state: AppState): void => {
 
   const voiceBusy = isVoiceBusyStatus(state.status);
   const textDisabled = state.isSendingText || state.status === 'recording' || voiceBusy;
+  const hasDraftText = state.draftText.trim().length > 0;
   const actionButton =
     state.status === 'error'
       ? `<button id="recover-button" class="secondary-button">${actionButtonLabel(state)}</button>`
@@ -45,23 +68,26 @@ export const renderApp = (root: HTMLElement, state: AppState): void => {
 
   root.innerHTML = `
     <main class="shell">
-      <header class="status-bar">
-        <div class="status-pill">状态：${statusLabelMap[state.status]}</div>
-        <div class="status-pill">${state.sessionId ? '会话已连接' : '正在初始化'}</div>
-        <div class="status-pill">${state.networkOnline ? '网络在线' : '网络离线'}</div>
+      <header class="app-header">
+        <div class="app-title">OpenClaw</div>
+        <div class="status-bar">
+          <div class="status-pill">状态：${statusLabelMap[state.status]}</div>
+          <div class="status-pill">${state.sessionId ? '会话已连接' : '正在初始化'}</div>
+          <div class="status-pill">${state.networkOnline ? '网络在线' : '网络离线'}</div>
+        </div>
       </header>
-      <section class="voice-panel">
-        <button id="voice-button" class="voice-button" ${!state.sessionId || !state.voiceSupported || state.isSendingText || voiceBusy ? 'disabled' : ''}>${voiceButtonLabel(state)}</button>
-        <div class="voice-hint">语音是主入口，文本输入只作为兜底。</div>
-      </section>
       <section class="messages" aria-live="polite">
-        ${messageItems || '<div class="empty-state">现在可以开始说话，或先输入文本。</div>'}
+        ${messageItems || '<div class="empty-state"><div class="empty-title">今天想聊什么？</div><div class="empty-copy">可以直接输入，也可以使用车机键盘语音输入。</div></div>'}
       </section>
       <section class="composer">
-        <label class="composer-label" for="text-input">文本输入（MVP 兜底）</label>
-        <textarea id="text-input" class="composer-input" rows="3" placeholder="直接输入要说的话" ${textDisabled ? 'disabled' : ''}>${escapeHtml(state.draftText)}</textarea>
+        <div class="composer-row">
+          <textarea id="text-input" class="composer-input" rows="2" placeholder="${voiceHintText(state)}" ${textDisabled ? 'disabled' : ''}>${escapeHtml(state.draftText)}</textarea>
+          <button id="send-button" class="icon-button send-icon-button${hasDraftText ? '' : ' send-icon-button-hidden'}" ${textDisabled || !state.sessionId || !hasDraftText ? 'disabled' : ''} aria-label="${state.isSendingText ? '发送中' : '发送消息'}">${state.isSendingText ? '…' : sendIcon()}</button>
+        </div>
         <div class="composer-actions">
-          <button id="send-button" class="send-button" ${textDisabled || !state.sessionId ? 'disabled' : ''}>${state.isSendingText ? '发送中...' : '发送'}</button>
+          <div class="composer-tools">
+            <button id="voice-button" class="icon-button voice-tool-button" ${!state.sessionId || !state.voiceSupported || state.isSendingText || voiceBusy ? 'disabled' : ''} aria-label="${voiceButtonLabel(state)}">${micIcon()}</button>
+          </div>
           ${actionButton}
           <span class="error-text">${state.error ?? ''}</span>
         </div>
