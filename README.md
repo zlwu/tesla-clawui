@@ -13,7 +13,8 @@
 ## 当前状态
 
 - 本地浏览器验证已通过：页面加载、文本发送、语音录音、刷新恢复、弱网手动重试
-- 真实 provider 联调已通过：`Qwen ASR + OpenRouter LLM`
+- 真实 provider 联调已通过：`Qwen ASR + OpenClaw Gateway LLM`
+- 本地 OpenClaw Gateway HTTP chat endpoint 已完成真实 `/api/text/input` 联调
 - 开发态与生产态都已验证可由 Fastify 单服务统一托管页面与 API
 - 本地接手校验已通过：`npm run lint`、`npm run typecheck`、`npm test`、`npm run build`
 - Tesla 真机主链路验证已通过，当前结论为 `Proceed with Caveats`
@@ -38,6 +39,7 @@
 - `npm run lint`：执行 ESLint
 - `npm run typecheck`：执行 TypeScript 严格检查
 - `npm run test`：执行 Vitest
+- `npm run smoke:openclaw`：对当前运行中的服务执行一次 OpenClaw 文本主链路冒烟
 
 ## 环境变量
 
@@ -45,6 +47,8 @@
 - 示例配置见 `.env.example`
 - 默认同源访问 `/api`
 - 如果前端需要直连其他 API 域名，可设置 `VITE_API_BASE_URL`
+- 当前推荐 LLM 配置为 `LLM_PROVIDER=openclaw`
+- OpenClaw 使用 `LLM_BASE_URL`、`LLM_API_KEY`、`LLM_MODEL`，可选 `OPENCLAW_AGENT_ID`
 
 ## 运行步骤
 
@@ -64,9 +68,31 @@
 
 真机实测请直接使用 `docs/tesla-openclaw-smoke-checklist.md`。
 
+本地 OpenClaw 文本主链路可执行：
+
+```bash
+npm run smoke:openclaw
+```
+
+可选环境变量：
+
+- `SMOKE_BASE_URL`：默认 `http://127.0.0.1:3000`
+- `SMOKE_TEXT`：自定义本次冒烟发送的文本
+
 ## 已知边界
 
-- 真实 `ASR + LLM` 本地已验证通过，但 Tesla 真机兼容性仍未完成
+- 真实 `ASR + LLM` 本地已验证通过，Tesla 真机主链路也已验证通过
+- 当前 LLM 主链路已切换为本地 OpenClaw Gateway；如需回退，可改回 `openai-compatible`
 - TTS、手机端协同、SSE、WebSocket 都不在 MVP
-- Tesla 真机兼容性仍需按 `docs/tesla-openclaw-mvp-validation-plan.md` 实测
+- Tesla 真机当前结论为 `Proceed with Caveats`，仍可继续按 `docs/tesla-openclaw-mvp-validation-plan.md` 补充后续回归与优化验证
+- Tesla 真机网页麦克风权限不可用，因此首版真机主路径改为系统语音输入法 / 长按系统语音键输入
 - `cloudflared`/临时公网隧道只用于测试，不属于正式产品方案
+
+## OpenClaw 接入
+
+- 当前仓库默认按本地 OpenClaw Gateway 联调
+- 将 `LLM_PROVIDER` 设为 `openclaw`
+- 将 `LLM_BASE_URL` 设为 OpenClaw Gateway 的 `/v1/chat/completions`
+- 将 `LLM_API_KEY` 设为 Gateway token 或 password 对应 bearer token
+- 将 `LLM_MODEL` 设为 `openclaw` 或 `openclaw:<agentId>`
+- 如需固定 agent，也可设置 `OPENCLAW_AGENT_ID`，服务端会自动把它编码到 `LLM_MODEL`

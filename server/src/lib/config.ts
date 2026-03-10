@@ -18,10 +18,11 @@ const configSchema = z.object({
   SESSION_TOKEN_BYTES: z.coerce.number().int().min(16).max(64).default(24),
   MESSAGE_LIMIT_DEFAULT: z.coerce.number().int().min(1).max(20).default(8),
   MESSAGE_LIMIT_MAX: z.coerce.number().int().min(1).max(20).default(20),
-  LLM_PROVIDER: z.enum(['mock', 'openai-compatible']).default('mock'),
+  LLM_PROVIDER: z.enum(['mock', 'openai-compatible', 'openclaw']).default('mock'),
   LLM_BASE_URL: z.string().optional(),
   LLM_API_KEY: z.string().optional(),
   LLM_MODEL: z.string().min(1).default('openai/gpt-4o-mini'),
+  OPENCLAW_AGENT_ID: z.string().min(1).optional(),
   ASR_PROVIDER: z.enum(['mock', 'openai-compatible', 'qwen']).default('mock'),
   ASR_BASE_URL: z.string().optional(),
   ASR_API_KEY: z.string().optional(),
@@ -36,10 +37,11 @@ export type AppConfig = {
   sessionTokenBytes: number;
   messageLimitDefault: number;
   messageLimitMax: number;
-  llmProvider: 'mock' | 'openai-compatible';
+  llmProvider: 'mock' | 'openai-compatible' | 'openclaw';
   llmBaseUrl?: string;
   llmApiKey?: string;
   llmModel: string;
+  openclawAgentId?: string;
   asrProvider: 'mock' | 'openai-compatible' | 'qwen';
   asrBaseUrl?: string;
   asrApiKey?: string;
@@ -66,6 +68,7 @@ export const loadConfig = (): AppConfig => {
     ...(env.LLM_BASE_URL ? { llmBaseUrl: env.LLM_BASE_URL } : {}),
     ...(env.LLM_API_KEY ? { llmApiKey: env.LLM_API_KEY } : {}),
     llmModel: env.LLM_MODEL,
+    ...(env.OPENCLAW_AGENT_ID ? { openclawAgentId: env.OPENCLAW_AGENT_ID } : {}),
     asrProvider: env.ASR_PROVIDER,
     ...(env.ASR_BASE_URL ? { asrBaseUrl: env.ASR_BASE_URL } : {}),
     ...(env.ASR_API_KEY ? { asrApiKey: env.ASR_API_KEY } : {}),

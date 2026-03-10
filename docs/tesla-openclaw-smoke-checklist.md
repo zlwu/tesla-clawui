@@ -33,8 +33,9 @@
 ## 当前已知前置结论
 
 - Mac Chromium 下本清单的本地预检已通过
-- 真实 provider 联调已通过：`Qwen ASR + OpenRouter LLM`
+- 真实 provider 联调已通过：`Qwen ASR + OpenClaw Gateway LLM`
 - Tesla 真机主链路已验证通过，但存在输入面板遮挡瑕疵
+- 本地可用 `npm run smoke:openclaw` 复检文本主链路
 
 ## 当前真机验证结果
 

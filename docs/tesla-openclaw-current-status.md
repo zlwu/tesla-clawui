@@ -48,6 +48,13 @@
 1. `OpenRouter LLM`
 2. `Qwen ASR`
 3. 生产模式下首页与 API 同样可用
+4. 本地 OpenClaw Gateway HTTP chat endpoint 已完成真实 `/api/text/input` 联调
+
+当前推荐 LLM 主链路为：
+
+1. `OpenClaw Gateway LLM`
+2. `Qwen ASR`
+3. `OpenRouter LLM` 仅保留为可回退路径
 
 ## 接手后本地工程校验
 

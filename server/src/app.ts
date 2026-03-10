@@ -122,7 +122,6 @@ export const createApp = () => {
   void app.register(fastifyStatic, {
     root: webDistDir,
     prefix: '/',
-    decorateReply: false,
   });
   void app.register(healthRoutes);
   void app.register(sessionRoutes);

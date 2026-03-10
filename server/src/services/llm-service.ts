@@ -4,6 +4,7 @@ import type { Message } from '@tesla-openclaw/shared';
 import type { AppConfig } from '../lib/config.js';
 import { logStepFailure, logStepSuccess } from '../lib/observability.js';
 import { MockLlmProvider } from '../providers/llm/mock-provider.js';
+import { OpenClawProvider } from '../providers/llm/openclaw-provider.js';
 import { OpenAiCompatibleProvider } from '../providers/llm/openai-compatible-provider.js';
 import type { LlmProvider } from '../providers/llm/provider.js';
 
@@ -12,9 +13,11 @@ export class LlmService {
 
   public constructor(config: AppConfig) {
     this.provider =
-      config.llmProvider === 'openai-compatible'
-        ? new OpenAiCompatibleProvider(config)
-        : new MockLlmProvider();
+      config.llmProvider === 'openclaw'
+        ? new OpenClawProvider(config)
+        : config.llmProvider === 'openai-compatible'
+          ? new OpenAiCompatibleProvider(config)
+          : new MockLlmProvider();
   }
 
   public async generateReply(params: {
