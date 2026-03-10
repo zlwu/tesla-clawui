@@ -120,9 +120,91 @@ body {
 
 .message-content {
   margin: 0;
+  display: grid;
+  gap: 12px;
   font-size: clamp(24px, 3vw, 34px);
   line-height: 1.42;
   letter-spacing: -0.01em;
+  word-break: break-word;
+}
+
+.message-content-text,
+.md-paragraph {
+  margin: 0;
+}
+
+.md-heading {
+  margin: 0;
+  letter-spacing: -0.03em;
+  line-height: 1.18;
+}
+
+.md-heading-2 {
+  font-size: clamp(28px, 3.2vw, 38px);
+  font-weight: 800;
+}
+
+.md-heading-3 {
+  font-size: clamp(25px, 3vw, 34px);
+  font-weight: 760;
+}
+
+.md-list,
+.md-blockquote .md-paragraph {
+  margin: 0;
+}
+
+.md-list {
+  padding-left: 1.3em;
+  display: grid;
+  gap: 8px;
+}
+
+.md-list-item {
+  padding-left: 0.08em;
+}
+
+.md-blockquote {
+  margin: 0;
+  padding: 10px 0 10px 16px;
+  border-left: 4px solid #d9d9e3;
+  color: #4d4d5f;
+  background: #f7f7f8;
+  border-radius: 0 16px 16px 0;
+}
+
+.md-inline-code {
+  padding: 0.06em 0.32em;
+  border-radius: 8px;
+  background: #ececf1;
+  font-size: 0.88em;
+  font-family:
+    ui-monospace,
+    "SFMono-Regular",
+    "SF Mono",
+    Consolas,
+    monospace;
+}
+
+.md-code-block {
+  margin: 0;
+  padding: 16px 18px;
+  overflow-x: auto;
+  border-radius: 18px;
+  background: #202123;
+  color: #f7f7f8;
+  font-size: clamp(18px, 2.3vw, 24px);
+  line-height: 1.5;
+  font-family:
+    ui-monospace,
+    "SFMono-Regular",
+    "SF Mono",
+    Consolas,
+    monospace;
+}
+
+.md-code-block code {
+  white-space: pre-wrap;
   word-break: break-word;
 }
 

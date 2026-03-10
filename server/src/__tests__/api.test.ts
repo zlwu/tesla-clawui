@@ -153,4 +153,39 @@ describe('server api', () => {
 
     await app.close();
   });
+
+  it('streams text deltas and final response over SSE', async () => {
+    const { app } = createApp();
+
+    const createResponse = await app.inject({
+      method: 'POST',
+      url: '/api/session/create',
+      payload: {
+        device: { type: 'tesla-browser', label: 'tesla-mcu2' },
+      },
+    });
+    const createPayload = createResponse.json<{ data: { session: { sessionId: string }; sessionToken: string } }>();
+
+    const streamResponse = await app.inject({
+      method: 'POST',
+      url: '/api/text/input/stream',
+      headers: {
+        authorization: `Bearer ${createPayload.data.sessionToken}`,
+      },
+      payload: {
+        sessionId: createPayload.data.session.sessionId,
+        text: '流式测试',
+        requestId: createRequestId('req_text_stream'),
+      },
+    });
+
+    expect(streamResponse.statusCode).toBe(200);
+    expect(streamResponse.headers['content-type']).toContain('text/event-stream');
+    expect(streamResponse.body).toContain('event: start');
+    expect(streamResponse.body).toContain('event: delta');
+    expect(streamResponse.body).toContain('event: done');
+    expect(streamResponse.body).toContain('MVP mock 回复');
+
+    await app.close();
+  });
 });

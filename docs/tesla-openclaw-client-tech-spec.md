@@ -317,7 +317,8 @@ Tesla Browser -> App Server -> OpenClaw / LLM Provider
 ### 可选
 - `GET /api/audio/:id`（后续启用 TTS 时）
 - `GET /api/status?sessionId=...`
-- `GET /api/events?sessionId=...`（如后续采用 SSE）
+- `POST /api/text/input/stream`（已实现的文本 SSE 流式接口）
+- `GET /api/events?sessionId=...`（如后续采用更通用的 SSE 状态流）
 
 ---
 
@@ -333,7 +334,7 @@ Tesla Browser -> App Server -> OpenClaw / LLM Provider
 
 2. 中间消息区
    - 最近 6~8 条消息
-   - 纯文本渲染
+   - 用户消息保持纯文本；assistant 消息支持受控 Markdown 子集渲染
    - **大字体优先，可读性优先**
 
 3. 底部输入区
@@ -632,7 +633,8 @@ interface TtsProvider {
 ## Phase 4：可选体验增强
 
 - 可选 TTS
-- 简单 SSE 状态流
+- 简单文本 SSE 流
+- assistant 受控 Markdown 子集渲染
 - 历史压缩
 - 性能指标面板
 
@@ -645,6 +647,7 @@ interface TtsProvider {
 - 引入 React / Next.js / Vue
 - 引入大型 UI 组件库
 - 在前端实现复杂 Markdown 渲染
+- 在 streaming 稳定前过早做完整 Markdown 排版
 - 在浏览器端直接调用 LLM API
 - 将 API key 暴露到前端
 - 在第一版引入手机协同与双端同步

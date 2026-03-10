@@ -24,6 +24,27 @@ describe('renderApp', () => {
     expect(root.querySelector('.message-content')).not.toBeNull();
   });
 
+  it('renders assistant markdown blocks into structured content', () => {
+    const root = document.createElement('div');
+    const state = createInitialState();
+    state.messages = [
+      {
+        messageId: 'msg_1',
+        sessionId: 'sess_1',
+        role: 'assistant',
+        content: '## 标题\n\n- 列表项\n\n> 引用',
+        source: 'llm',
+        createdAt: new Date().toISOString(),
+      },
+    ];
+
+    renderApp(root, state);
+
+    expect(root.querySelector('.md-heading-2')?.textContent).toBe('标题');
+    expect(root.querySelector('.md-list-item')?.textContent).toBe('列表项');
+    expect(root.querySelector('.md-blockquote')?.textContent).toContain('引用');
+  });
+
   it('renders the voice button', () => {
     const root = document.createElement('div');
     const state = createInitialState();

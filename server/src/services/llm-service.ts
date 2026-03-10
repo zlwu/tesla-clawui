@@ -67,4 +67,58 @@ export class LlmService {
       throw error;
     }
   }
+
+  public async generateReplyStream(params: {
+    sessionId: string;
+    requestId: string;
+    text: string;
+    history: Message[];
+    onDelta(delta: string): Promise<void> | void;
+    logger?: FastifyBaseLogger | undefined;
+  }): Promise<string> {
+    const startedAt = Date.now();
+
+    try {
+      const reply = await this.provider.generateReplyStream(
+        {
+          sessionId: params.sessionId,
+          requestId: params.requestId,
+          text: params.text,
+          history: params.history.map((message) => ({
+            role: message.role,
+            content: message.content,
+          })),
+        },
+        { onDelta: (delta) => params.onDelta(delta) },
+      );
+
+      logStepSuccess({
+        logger: params.logger,
+        event: 'llm.completed',
+        startedAt,
+        context: {
+          sessionId: params.sessionId,
+          requestId: params.requestId,
+          historyCount: params.history.length,
+          mode: 'stream',
+        },
+      });
+
+      return reply;
+    } catch (error) {
+      logStepFailure({
+        logger: params.logger,
+        event: 'llm.failed',
+        startedAt,
+        error,
+        context: {
+          sessionId: params.sessionId,
+          requestId: params.requestId,
+          historyCount: params.history.length,
+          mode: 'stream',
+        },
+      });
+      throw error;
+    }
+  }
 }

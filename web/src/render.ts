@@ -1,4 +1,5 @@
 import type { AppState } from './state.js';
+import { escapeHtml, renderMarkdown, renderPlainText } from './render-markdown.js';
 import { isVoiceBusyStatus, statusLabelMap } from './state-machine.js';
 
 const messageClassName = (role: string) =>
@@ -50,7 +51,7 @@ export const renderApp = (root: HTMLElement, state: AppState): void => {
             <div class="message-avatar">${message.role === 'assistant' ? 'OC' : '你'}</div>
             <div class="message-body">
               <div class="message-role">${message.role === 'assistant' ? 'OpenClaw' : '你'}</div>
-              <p class="message-content">${escapeHtml(message.content)}</p>
+              <div class="message-content">${message.role === 'assistant' ? renderMarkdown(message.content) : renderPlainText(message.content)}</div>
             </div>
           </div>
         </article>
@@ -94,14 +95,4 @@ export const renderApp = (root: HTMLElement, state: AppState): void => {
       </section>
     </main>
   `;
-};
-
-const escapeHtml = (value: string): string => {
-  let escaped = value;
-  escaped = escaped.split('&').join('&amp;');
-  escaped = escaped.split('<').join('&lt;');
-  escaped = escaped.split('>').join('&gt;');
-  escaped = escaped.split('"').join('&quot;');
-  escaped = escaped.split("'").join('&#39;');
-  return escaped;
 };

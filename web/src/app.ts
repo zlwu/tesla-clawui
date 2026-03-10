@@ -1,12 +1,13 @@
 import type { AppError, AppErrorCode, AppStatus } from '@tesla-openclaw/shared';
 
-import { createSession, fetchMessages, sendTextMessage, sendVoiceMessage } from './api.js';
+import { createSession, fetchMessages, sendTextMessageStream, sendVoiceMessage } from './api.js';
 import { toDisplayErrorMessage } from './errors.js';
 import { clearPersistedState, persistSessionState, readPersistedState } from './persistence.js';
 import { renderApp } from './render.js';
 import { createInitialState, type AppState, type RetryAction } from './state.js';
 import { buildVisibleMessages, isVoiceBusyStatus, limitMessages, transitionStatus } from './state-machine.js';
 import { VoiceRecorder } from './voice-recorder.js';
+import type { Message } from '@tesla-openclaw/shared';
 
 const createRequestId = (prefix: string): string =>
   `${prefix}_${Date.now()}_${Math.random().toString(16).slice(2, 10)}`;
@@ -317,6 +318,24 @@ export class TeslaOpenClawApp {
     }
 
     const requestId = createRequestId('req_text');
+    const optimisticUserMessage = this.createOptimisticMessage({
+      messageId: `local_user_${requestId}`,
+      role: 'user',
+      content: text,
+      source: 'text',
+    });
+    const optimisticAssistantMessage = this.createOptimisticMessage({
+      messageId: `local_assistant_${requestId}`,
+      role: 'assistant',
+      content: '',
+      source: 'llm',
+    });
+    this.state.messages = limitMessages([
+      ...this.state.messages,
+      optimisticUserMessage,
+      optimisticAssistantMessage,
+    ]);
+    this.state.draftText = '';
     this.state.isSendingText = true;
     this.state.status = 'thinking';
     this.state.error = null;
@@ -324,26 +343,30 @@ export class TeslaOpenClawApp {
     this.state.retryAction = null;
     this.render();
 
-    const result = await sendTextMessage({
+    const result = await sendTextMessageStream({
       sessionId: this.state.sessionId,
       sessionToken: this.state.sessionToken,
       text,
       requestId,
+      onStart: () => {
+        this.render();
+      },
+      onDelta: (delta) => {
+        this.updateOptimisticAssistantMessage(requestId, delta);
+        this.render();
+      },
     });
 
     if (!result.ok) {
+      this.removeOptimisticMessages(requestId);
+      this.state.draftText = text;
       this.state.isSendingText = false;
       this.applyApiFailure(result, { kind: 'send-text', requestId, text });
       this.render();
       return;
     }
 
-    this.state.messages = limitMessages([
-      ...this.state.messages,
-      result.data.userMessage,
-      result.data.assistantMessage,
-    ]);
-    this.state.draftText = '';
+    this.replaceOptimisticMessages(requestId, result.data.userMessage, result.data.assistantMessage);
     this.state.isSendingText = false;
     this.state.status = 'idle';
     this.state.error = null;
@@ -494,38 +517,114 @@ export class TeslaOpenClawApp {
       return;
     }
 
+    const optimisticUserMessage = this.createOptimisticMessage({
+      messageId: `local_user_${action.requestId}`,
+      role: 'user',
+      content: action.text,
+      source: 'text',
+    });
+    const optimisticAssistantMessage = this.createOptimisticMessage({
+      messageId: `local_assistant_${action.requestId}`,
+      role: 'assistant',
+      content: '',
+      source: 'llm',
+    });
+    this.state.messages = limitMessages([
+      ...this.state.messages,
+      optimisticUserMessage,
+      optimisticAssistantMessage,
+    ]);
+    this.state.draftText = '';
     this.state.isSendingText = true;
     this.state.status = 'thinking';
     this.state.error = null;
     this.state.errorCode = null;
     this.render();
 
-    const result = await sendTextMessage({
+    const result = await sendTextMessageStream({
       sessionId: this.state.sessionId,
       sessionToken: this.state.sessionToken,
       text: action.text,
       requestId: action.requestId,
+      onStart: () => {
+        this.render();
+      },
+      onDelta: (delta) => {
+        this.updateOptimisticAssistantMessage(action.requestId, delta);
+        this.render();
+      },
     });
 
     if (!result.ok) {
+      this.removeOptimisticMessages(action.requestId);
+      this.state.draftText = action.text;
       this.state.isSendingText = false;
       this.applyApiFailure(result, action);
       this.render();
       return;
     }
 
-    this.state.messages = limitMessages([
-      ...this.state.messages,
-      result.data.userMessage,
-      result.data.assistantMessage,
-    ]);
-    this.state.draftText = '';
+    this.replaceOptimisticMessages(action.requestId, result.data.userMessage, result.data.assistantMessage);
     this.state.isSendingText = false;
     this.state.status = 'idle';
     this.state.error = null;
     this.state.errorCode = null;
     this.persistState();
     this.render();
+  }
+
+  private createOptimisticMessage(params: {
+    messageId: string;
+    role: Message['role'];
+    content: string;
+    source: Message['source'];
+  }): Message {
+    return {
+      messageId: params.messageId,
+      sessionId: this.state.sessionId ?? 'pending',
+      role: params.role,
+      content: params.content,
+      source: params.source,
+      createdAt: new Date().toISOString(),
+    };
+  }
+
+  private updateOptimisticAssistantMessage(requestId: string, delta: string): void {
+    this.state.messages = this.state.messages.map((message) =>
+      message.messageId === `local_assistant_${requestId}`
+        ? {
+          ...message,
+          content: message.content + delta,
+        }
+        : message,
+    );
+  }
+
+  private removeOptimisticMessages(requestId: string): void {
+    this.state.messages = this.state.messages.filter(
+      (message) =>
+        message.messageId !== `local_user_${requestId}`
+        && message.messageId !== `local_assistant_${requestId}`,
+    );
+  }
+
+  private replaceOptimisticMessages(requestId: string, userMessage: Message, assistantMessage: Message): void {
+    const messages: Message[] = [];
+    for (const message of this.state.messages) {
+      if (message.messageId === `local_user_${requestId}`) {
+        messages.push(userMessage);
+        continue;
+      }
+
+      if (message.messageId === `local_assistant_${requestId}`) {
+        messages.push(assistantMessage);
+        continue;
+      }
+
+      messages.push(message);
+    }
+
+    this.state.messages = limitMessages(messages);
   }
 
   private startVoiceProgressIndicators(): void {

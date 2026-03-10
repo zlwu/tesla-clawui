@@ -47,11 +47,16 @@ Tesla OpenClaw 项目的后续开发必须遵守以下规则。
 - Phase 2 已完成
 - Phase 3 已完成
 - Phase 4 的开发与文档已完成
-- `T4.6` Tesla 真机验证尚未完成
+- `T4.6` Tesla 真机验证已完成，当前结论为 `Proceed with Caveats`
+- 文本主链路已支持 SSE streaming
+- assistant 消息已支持受控 Markdown 子集渲染
 
 ## 当前已验证结论
 
 - 本地浏览器验证通过：页面加载、session 创建、文本发送、刷新恢复、弱网手动重试
+- 真实 provider 联调已通过：`Qwen ASR + OpenClaw Gateway LLM`
+- 本地 OpenClaw Gateway HTTP chat endpoint 已完成真实 `/api/text/input` 联调
+- `npm run smoke:openclaw` 已通过真实 OpenClaw Gateway 主链路验证
 - 语音浏览器真录音未在本地 headless 浏览器完成，因为没有真实麦克风设备
 - 公网临时隧道可用但不稳定，不应当写进长期方案
 
@@ -59,4 +64,6 @@ Tesla OpenClaw 项目的后续开发必须遵守以下规则。
 
 - 每次改动后优先执行 `npm run lint`、`npm run typecheck`、`npm test`、`npm run build`
 - 先补文档再扩功能时，要同步更新 `README.md`
+- 涉及文本输出体验时，默认建立在现有 SSE streaming 主链路之上，不回退到轮询或 WebSocket 重构
+- Markdown 渲染只允许做受控子集增强；不要引入完整富文本、HTML 直通、表格图片等复杂能力
 - 如果只是为了临时 Tesla 外网访问，可使用 `cloudflared` quick tunnel；不要把它写成产品正式依赖
