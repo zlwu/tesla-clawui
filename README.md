@@ -28,7 +28,8 @@
 - Tesla 真机主输入路径已调整为：系统语音输入法 / 长按系统语音键输入 -> 文本框 -> 发送
 - 当前输入区已收口为：单一 composer、右侧发送按钮、系统语音输入提示
 - 当前消息滚动策略已收口为：初始定位到底部、streaming 默认跟随、用户手动上滑后停止强制跟随
-- 当前 Tesla 键盘避让策略已补充：优先使用 `interactive-widget` / `visualViewport`，失效时退回 focus 驱动的保守上移
+- 当前 Tesla 键盘避让策略已收口为：focus 时启用保守底部留白，blur 后恢复并回到底部，优先保证 Tesla 真机稳定性
+- 当前渲染层已切到稳定 DOM 壳体 + 局部 patch，以保住焦点、滚动和 streaming 期间的节点稳定性
 
 ## 目录
 
@@ -99,6 +100,7 @@ npm run smoke:openclaw
 - TTS、手机端协同、WebSocket 都不在 MVP
 - 当前已落地的流式能力限定为文本 SSE streaming，不扩展为 WebSocket 对话架构
 - Markdown 渲染当前仅限 assistant 消息的受控子集，不支持 HTML 直通、表格、图片和复杂嵌套语法
+- 当前 `renderApp()` 已切到固定壳体 + keyed message patch，不再做整页 `innerHTML` 重建
 - 当前登录能力仅为 shared PIN 门禁，不是多用户账号体系；适合单环境 / 小范围固定用户使用
 - Tesla 真机当前结论为 `Proceed with Caveats`，仍可继续按 `docs/tesla-openclaw-mvp-validation-plan.md` 补充后续回归与优化验证
 - Tesla 真机网页麦克风权限不可用，因此网页录音与 ASR 已从主线删除，首版真机主路径固定为系统语音输入法 / 长按系统语音键输入

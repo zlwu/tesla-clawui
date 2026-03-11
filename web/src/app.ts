@@ -35,6 +35,7 @@ export class TeslaOpenClawApp {
   public async start(): Promise<void> {
     this.state.networkOnline = this.readNetworkOnline();
     this.bindEvents();
+    this.syncViewportHeight();
     this.render();
     await this.bootstrapApp();
   }
@@ -199,27 +200,13 @@ export class TeslaOpenClawApp {
       this.keyboardMode = false;
       this.clearKeyboardFallbackCheck();
       this.syncKeyboardViewport();
-    });
-
-    window.visualViewport?.addEventListener('resize', () => {
-      if (!this.keyboardMode) {
-        return;
-      }
-
-      this.syncKeyboardViewport();
-      this.scheduleKeyboardFallbackCheck();
-      this.scrollComposerIntoView();
-    });
-
-    window.visualViewport?.addEventListener('scroll', () => {
-      if (!this.keyboardMode) {
-        return;
-      }
-
-      this.syncKeyboardViewport();
+      window.setTimeout(() => {
+        this.scrollMessagesToBottom({ force: true });
+      }, 80);
     });
 
     window.addEventListener('resize', () => {
+      this.syncViewportHeight();
       if (!this.keyboardMode) {
         return;
       }
@@ -242,6 +229,7 @@ export class TeslaOpenClawApp {
     this.lastRenderSignature = nextSignature;
     renderApp(this.root, viewState);
 
+    this.syncViewportHeight();
     this.syncComposerInputHeight();
     this.syncKeyboardViewport();
     if (this.pendingInitialScroll || this.shouldAutoScrollMessages) {
@@ -309,20 +297,16 @@ export class TeslaOpenClawApp {
     return typeof navigator === 'undefined' ? true : navigator.onLine;
   }
 
-  private syncKeyboardViewport(): void {
-    const visualViewport = window.visualViewport;
-    const keyboardOffset =
-      this.keyboardMode && visualViewport
-        ? Math.max(window.innerHeight - visualViewport.height - visualViewport.offsetTop, 0)
-        : 0;
-    const keyboardFallbackOffset = this.getKeyboardFallbackOffset(keyboardOffset);
+  private syncViewportHeight(): void {
+    const viewportHeight = Math.max(window.innerHeight, 320);
+    this.root.style.setProperty('--app-viewport-height', `${Math.max(viewportHeight, 320)}px`);
+  }
 
-    this.root.style.setProperty('--keyboard-offset', `${keyboardOffset}px`);
-    this.root.style.setProperty('--keyboard-fallback-offset', `${keyboardFallbackOffset}px`);
-    this.root.classList.toggle(
-      'keyboard-active',
-      this.keyboardMode || keyboardOffset > 0 || keyboardFallbackOffset > 0,
-    );
+  private syncKeyboardViewport(): void {
+    const keyboardInset = this.keyboardMode ? this.getKeyboardFallbackOffset() : 0;
+
+    this.root.style.setProperty('--keyboard-inset', `${keyboardInset}px`);
+    this.root.classList.toggle('keyboard-active', this.keyboardMode || keyboardInset > 0);
   }
 
   private scrollMessagesToBottom(options?: { force?: boolean }): void {
@@ -361,7 +345,6 @@ export class TeslaOpenClawApp {
       this.keyboardFallbackTimerId = null;
       this.syncKeyboardViewport();
       this.scrollComposerIntoView();
-      this.scrollMessagesToBottom();
     }, this.keyboardFallbackDelayMs);
   }
 
@@ -374,12 +357,12 @@ export class TeslaOpenClawApp {
     this.keyboardFallbackTimerId = null;
   }
 
-  private getKeyboardFallbackOffset(keyboardOffset: number): number {
-    if (!this.keyboardMode || keyboardOffset > 24 || !this.shouldUseTouchKeyboardFallback()) {
+  private getKeyboardFallbackOffset(): number {
+    if (!this.keyboardMode || !this.shouldUseTouchKeyboardFallback()) {
       return 0;
     }
 
-    return Math.min(Math.max(Math.round(window.innerHeight * 0.36), 220), 320);
+    return Math.min(Math.max(Math.round(window.innerHeight * 0.22), 120), 180);
   }
 
   private shouldUseTouchKeyboardFallback(): boolean {

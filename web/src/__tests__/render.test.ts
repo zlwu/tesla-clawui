@@ -113,4 +113,50 @@ describe('renderApp', () => {
 
     expect(root.querySelector('#send-button')?.className).toContain('send-icon-button-hidden');
   });
+
+  it('keeps the textarea node stable across rerenders', () => {
+    const root = document.createElement('div');
+    const state = createInitialState();
+
+    renderApp(root, state);
+    const firstTextarea = root.querySelector<HTMLTextAreaElement>('#text-input');
+
+    state.draftText = '继续输入';
+    state.status = 'thinking';
+    renderApp(root, state);
+    const secondTextarea = root.querySelector<HTMLTextAreaElement>('#text-input');
+
+    expect(firstTextarea).toBe(secondTextarea);
+    expect(secondTextarea?.value).toBe('继续输入');
+  });
+
+  it('keeps the last message node stable during streaming updates', () => {
+    const root = document.createElement('div');
+    const state = createInitialState();
+    state.messages = [
+      {
+        messageId: 'msg_stream',
+        sessionId: 'sess_1',
+        role: 'assistant',
+        content: '第一段',
+        source: 'llm',
+        createdAt: new Date().toISOString(),
+      },
+    ];
+
+    renderApp(root, state);
+    const firstMessage = root.querySelector<HTMLElement>('[data-message-id="msg_stream"]');
+
+    state.messages = [
+      {
+        ...state.messages[0]!,
+        content: '第一段第二段',
+      },
+    ];
+    renderApp(root, state);
+    const secondMessage = root.querySelector<HTMLElement>('[data-message-id="msg_stream"]');
+
+    expect(firstMessage).toBe(secondMessage);
+    expect(secondMessage?.textContent).toContain('第一段第二段');
+  });
 });

@@ -123,7 +123,14 @@ Tesla 真机上已经确认：
 2. 初始进入页面时默认定位到最新消息
 3. 文本 streaming 期间默认跟随到底部
 4. 用户手动上滑查看历史后，停止强制自动跟随
-5. 输入框 focus 时优先使用 `visualViewport` 上移；Tesla 不回报有效 viewport 变化时退回固定安全偏移
+5. 输入框 focus 时启用 Tesla 专项保守底部留白；blur 后撤销留白并回到底部
+
+当前渲染层已完成的工程收口：
+
+1. `renderApp()` 已切到固定 auth/chat 壳体 + 局部 patch
+2. textarea、PIN 输入框和 message list 节点已保持稳定，不再按整页 `innerHTML` 重建
+3. assistant 消息按 `messageId` 做 keyed patch，streaming 时只更新对应消息节点
+4. 重构边界仍限定在渲染层，不改现有状态机、SSE 协议和 OpenClaw 主链路
 
 ## 外网访问说明
 
@@ -137,3 +144,4 @@ Tesla 真机上已经确认：
 2. assistant 消息的受控 Markdown 子集渲染已完成，当前优先保证安全和可读性，不扩展为完整富文本
 3. Tesla 键盘避让兼容已进入代码主线，下一步以真机回归为主
 4. 不再以网页内录音能力作为 Tesla 真机首版前提，项目主线固定为系统语音输入法 + 文本发送
+5. 下一步继续以 Tesla 真机回归为主，重点验证键盘避让和消息滚动在真实设备上的稳定性

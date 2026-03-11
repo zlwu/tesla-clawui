@@ -69,9 +69,11 @@ Tesla OpenClaw 项目的后续开发必须遵守以下规则。
 - 每次改动后优先执行 `npm run lint`、`npm run typecheck`、`npm test`、`npm run build`
 - 先补文档再扩功能时，要同步更新 `README.md`
 - 涉及文本输出体验时，默认建立在现有 SSE streaming 主链路之上，不回退到轮询或 WebSocket 重构
+- 当前渲染层若涉及重构，优先从整页 `innerHTML` 重建切到稳定 DOM 壳体 + 局部 patch；不要引入虚拟 DOM 框架
 - Markdown 渲染只允许做受控子集增强；不要引入完整富文本、HTML 直通、表格图片等复杂能力
 - 涉及消息滚动与输入区布局时，优先保持 composer 真实占位，不要回退到覆盖式浮层模型
-- 涉及 Tesla 系统输入面板兼容时，优先使用标准 viewport 信号；信号缺失时允许使用 focus 驱动的保守底部偏移兜底
+- 重构渲染层时，优先保证 textarea / PIN 输入框 / message list 节点稳定，避免焦点、滚动和键盘状态断裂
+- 涉及 Tesla 系统输入面板兼容时，优先保证 Tesla 真机稳定性；允许使用 focus 驱动的保守底部留白与 blur 后回底策略
 - 当前登录只允许做轻量 shared PIN gate；不要擅自扩成邮箱密码、OAuth 或多用户系统
 - 不要重新引入网页录音、语音上传接口或 ASR 依赖；Tesla 主链路固定为系统语音输入法 + 文本发送
 - 如果只是为了临时 Tesla 外网访问，可使用 `cloudflared` quick tunnel；不要把它写成产品正式依赖
