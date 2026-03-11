@@ -14,6 +14,7 @@
     "dev:web": "npm run dev -w @tesla-openclaw/web",
     "lint": "npm run lint -w @tesla-openclaw/shared && npm run lint -w @tesla-openclaw/server && npm run lint -w @tesla-openclaw/web",
     "smoke:openclaw": "node scripts/smoke-openclaw.mjs",
+    "start": "npm run start -w @tesla-openclaw/server",
     "test": "npm run build -w @tesla-openclaw/shared && npm run test -w @tesla-openclaw/shared && npm run test -w @tesla-openclaw/server && npm run test -w @tesla-openclaw/web",
     "typecheck": "npm run build -w @tesla-openclaw/shared && npm run typecheck -w @tesla-openclaw/server && npm run typecheck -w @tesla-openclaw/web"
   },
