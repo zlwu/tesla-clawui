@@ -1,6 +1,6 @@
 import type { AppError, AppErrorCode, AppStatus } from '@tesla-openclaw/shared';
 
-import { createSession, fetchMessages, sendTextMessageStream, sendVoiceMessage } from './api.js';
+import { createSession, fetchAuthConfig, fetchMessages, sendTextMessageStream, sendVoiceMessage, unlockWithPin } from './api.js';
 import { toDisplayErrorMessage } from './errors.js';
 import { clearPersistedState, persistSessionState, readPersistedState } from './persistence.js';
 import { renderApp } from './render.js';
@@ -16,6 +16,8 @@ export class TeslaOpenClawApp {
   private readonly persistedState = readPersistedState();
   private readonly state: AppState = {
     ...createInitialState(),
+    authToken: this.persistedState.authToken,
+    authExpiresAt: this.persistedState.authExpiresAt,
     sessionId: this.persistedState.sessionId,
     sessionToken: this.persistedState.sessionToken,
     messages: limitMessages(this.persistedState.messages),
@@ -34,10 +36,9 @@ export class TeslaOpenClawApp {
   public async start(): Promise<void> {
     this.state.voiceSupported = this.voiceRecorder.isSupported();
     this.state.networkOnline = this.readNetworkOnline();
-    this.render();
-    await this.ensureSession();
-    await this.loadMessages();
     this.bindEvents();
+    this.render();
+    await this.bootstrapApp();
   }
 
   private bindEvents(): void {
@@ -83,6 +84,11 @@ export class TeslaOpenClawApp {
 
       if (button.id === 'voice-button') {
         void this.handleVoiceAction();
+        return;
+      }
+
+      if (button.id === 'unlock-button') {
+        void this.handleUnlock();
       }
     };
 
@@ -100,6 +106,11 @@ export class TeslaOpenClawApp {
 
     this.root.addEventListener('input', (event) => {
       const target = event.target;
+      if (target instanceof HTMLInputElement && target.classList.contains('auth-pin-digit')) {
+        this.handlePinDigitInput(target);
+        return;
+      }
+
       if (!(target instanceof HTMLTextAreaElement) || target.id !== 'text-input') {
         return;
       }
@@ -107,6 +118,46 @@ export class TeslaOpenClawApp {
       this.state.draftText = target.value;
       this.syncComposerInputHeight();
       this.syncComposerDraftState();
+    });
+
+    this.root.addEventListener('keydown', (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLInputElement) || !target.classList.contains('auth-pin-digit')) {
+        return;
+      }
+
+      if (event.key === 'Backspace' && target.value === '') {
+        const previous = this.findPinDigitInput(Number(target.dataset.pinIndex ?? '-1') - 1);
+        previous?.focus();
+        previous?.select();
+      }
+    });
+
+    this.root.addEventListener('paste', (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLInputElement) || !target.classList.contains('auth-pin-digit')) {
+        return;
+      }
+
+      const pasted = event.clipboardData?.getData('text')?.replace(/\D/g, '').slice(0, 6) ?? '';
+      if (!pasted) {
+        return;
+      }
+
+      event.preventDefault();
+      const digits = this.getPinDigitInputs();
+      for (let index = 0; index < digits.length; index += 1) {
+        const digitInput = digits[index];
+        if (!digitInput) {
+          continue;
+        }
+        digitInput.value = pasted[index] ?? '';
+      }
+      this.state.pinDraft = pasted;
+      this.syncUnlockDraftState();
+      const nextIndex = Math.min(pasted.length, digits.length - 1);
+      digits[nextIndex]?.focus();
+      digits[nextIndex]?.select();
     });
 
     this.root.addEventListener(
@@ -188,6 +239,61 @@ export class TeslaOpenClawApp {
 
   private setStatus(next: AppStatus): void {
     this.state.status = transitionStatus(this.state.status, next);
+  }
+
+  private handlePinDigitInput(input: HTMLInputElement): void {
+    const digit = input.value.replace(/\D/g, '').slice(-1);
+    input.value = digit;
+    this.state.pinDraft = this.getPinDigitInputs()
+      .map((node) => node.value.replace(/\D/g, '').slice(0, 1))
+      .join('');
+    this.syncUnlockDraftState();
+
+    if (!digit) {
+      return;
+    }
+
+    const next = this.findPinDigitInput(Number(input.dataset.pinIndex ?? '-1') + 1);
+    next?.focus();
+    next?.select();
+  }
+
+  private getPinDigitInputs(): HTMLInputElement[] {
+    return Array.from(this.root.querySelectorAll<HTMLInputElement>('.auth-pin-digit'));
+  }
+
+  private findPinDigitInput(index: number): HTMLInputElement | null {
+    return this.root.querySelector<HTMLInputElement>(`.auth-pin-digit[data-pin-index="${index}"]`);
+  }
+
+  private syncUnlockDraftState(): void {
+    const unlockButton = this.root.querySelector<HTMLButtonElement>('#unlock-button');
+    if (!unlockButton) {
+      return;
+    }
+
+    unlockButton.disabled = this.state.isUnlocking || this.state.pinDraft.length !== 6;
+  }
+
+  private async bootstrapApp(): Promise<void> {
+    const authConfig = await fetchAuthConfig();
+    if (!authConfig.ok) {
+      this.applyApiFailure(authConfig, null);
+      this.render();
+      return;
+    }
+
+    this.state.authEnabled = authConfig.data.enabled;
+    const hasValidAuth = !this.state.authEnabled || this.hasValidAuthToken();
+    if (!hasValidAuth) {
+      this.requireUnlock();
+      this.render();
+      return;
+    }
+
+    this.state.authRequired = false;
+    await this.ensureSession();
+    await this.loadMessages();
   }
 
   private readNetworkOnline(): boolean {
@@ -274,6 +380,11 @@ export class TeslaOpenClawApp {
     failure: { error: AppError },
     retryAction: RetryAction | null,
   ): void {
+    if (failure.error.code === 'AUTH_REQUIRED') {
+      this.requireUnlock();
+      return;
+    }
+
     this.setErrorState(
       toDisplayErrorMessage(failure.error, this.readNetworkOnline()),
       failure.error.retryable ? retryAction : null,
@@ -282,26 +393,96 @@ export class TeslaOpenClawApp {
   }
 
   private persistState(): void {
-    if (!this.state.sessionId || !this.state.sessionToken) {
+    if (!this.state.authToken && (!this.state.sessionId || !this.state.sessionToken)) {
       clearPersistedState();
       return;
     }
 
     persistSessionState({
+      authToken: this.state.authToken,
+      authExpiresAt: this.state.authExpiresAt,
       sessionId: this.state.sessionId,
       sessionToken: this.state.sessionToken,
       messages: limitMessages(this.state.messages),
     });
   }
 
+  private hasValidAuthToken(): boolean {
+    return Boolean(
+      this.state.authToken &&
+      this.state.authExpiresAt &&
+      Date.parse(this.state.authExpiresAt) > Date.now(),
+    );
+  }
+
+  private requireUnlock(): void {
+    this.state.authRequired = true;
+    this.state.authToken = null;
+    this.state.authExpiresAt = null;
+    this.state.sessionId = null;
+    this.state.sessionToken = null;
+    this.state.messages = [];
+    this.state.draftText = '';
+    this.state.isSendingText = false;
+    this.state.isUnlocking = false;
+    this.state.status = 'idle';
+    this.state.error = null;
+    this.state.errorCode = null;
+    this.state.retryAction = null;
+    this.pendingInitialScroll = true;
+    this.shouldAutoScrollMessages = true;
+    clearPersistedState();
+  }
+
+  private async handleUnlock(): Promise<void> {
+    const pin = this.state.pinDraft.trim();
+    if (!/^\d{6}$/.test(pin)) {
+      this.setErrorState('请输入 6 位数字 PIN 码', null, 'VALIDATION_FAILED');
+      this.render();
+      return;
+    }
+
+    this.state.isUnlocking = true;
+    this.state.error = null;
+    this.state.errorCode = null;
+    this.render();
+
+    const result = await unlockWithPin(pin);
+    if (!result.ok) {
+      this.state.isUnlocking = false;
+      this.applyApiFailure(result, null);
+      this.render();
+      return;
+    }
+
+    this.state.authToken = result.data.authToken;
+    this.state.authExpiresAt = result.data.expiresAt;
+    this.state.authRequired = false;
+    this.state.isUnlocking = false;
+    this.state.pinDraft = '';
+    this.state.error = null;
+    this.state.errorCode = null;
+    this.persistState();
+    this.render();
+
+    await this.ensureSession();
+    await this.loadMessages();
+  }
+
   private async ensureSession(): Promise<void> {
+    if (this.state.authEnabled && !this.hasValidAuthToken()) {
+      this.requireUnlock();
+      this.render();
+      return;
+    }
+
     if (this.state.sessionId && this.state.sessionToken) {
       this.persistState();
       this.render();
       return;
     }
 
-    const result = await createSession();
+    const result = await createSession(this.state.authToken);
     if (!result.ok) {
       this.applyApiFailure(result, null);
       this.render();
@@ -323,7 +504,7 @@ export class TeslaOpenClawApp {
       return;
     }
 
-    const result = await fetchMessages(this.state.sessionId, this.state.sessionToken);
+    const result = await fetchMessages(this.state.sessionId, this.state.sessionToken, this.state.authToken);
     if (!result.ok) {
       this.applyApiFailure(result, { kind: 'reload-messages' });
       this.render();
@@ -387,6 +568,7 @@ export class TeslaOpenClawApp {
     const result = await sendTextMessageStream({
       sessionId: this.state.sessionId,
       sessionToken: this.state.sessionToken,
+      authToken: this.state.authToken,
       text,
       requestId,
       onStart: () => {
@@ -490,6 +672,7 @@ export class TeslaOpenClawApp {
     const result = await sendVoiceMessage({
       sessionId: this.state.sessionId,
       sessionToken: this.state.sessionToken,
+      authToken: this.state.authToken,
       requestId: params.requestId,
       blob: params.blob,
       mimeType: params.mimeType,
@@ -587,6 +770,7 @@ export class TeslaOpenClawApp {
     const result = await sendTextMessageStream({
       sessionId: this.state.sessionId,
       sessionToken: this.state.sessionToken,
+      authToken: this.state.authToken,
       text: action.text,
       requestId: action.requestId,
       onStart: () => {

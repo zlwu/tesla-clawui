@@ -1,6 +1,8 @@
 import type { AppError } from '@tesla-openclaw/shared';
 
 const errorMessageMap: Record<AppError['code'], string> = {
+  AUTH_REQUIRED: '请先输入 PIN 码解锁。',
+  AUTH_INVALID_PIN: 'PIN 码不正确，请重新输入。',
   SESSION_NOT_FOUND: '当前会话不存在，请刷新后重试。',
   SESSION_EXPIRED: '当前会话已失效，请刷新后重试。',
   SESSION_UNAUTHORIZED: '当前会话无权访问，请刷新后重试。',

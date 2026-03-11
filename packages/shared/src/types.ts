@@ -4,6 +4,7 @@ import type {
   appErrorSchema,
   appErrorCodeSchema,
   appStatusSchema,
+  authConfigResponseSchema,
   createSessionRequestSchema,
   createSessionResponseSchema,
   healthResponseSchema,
@@ -15,6 +16,8 @@ import type {
   sessionSchema,
   textInputRequestSchema,
   textInputResponseSchema,
+  unlockRequestSchema,
+  unlockResponseSchema,
   voiceInputFieldsSchema,
   voiceInputResponseSchema,
 } from './schemas.js';
@@ -28,6 +31,9 @@ export type Message = z.infer<typeof messageSchema>;
 export type AppError = z.infer<typeof appErrorSchema>;
 export type CreateSessionRequest = z.infer<typeof createSessionRequestSchema>;
 export type CreateSessionResponse = z.infer<typeof createSessionResponseSchema>;
+export type AuthConfigResponse = z.infer<typeof authConfigResponseSchema>;
+export type UnlockRequest = z.infer<typeof unlockRequestSchema>;
+export type UnlockResponse = z.infer<typeof unlockResponseSchema>;
 export type TextInputRequest = z.infer<typeof textInputRequestSchema>;
 export type TextInputResponse = z.infer<typeof textInputResponseSchema>;
 export type VoiceInputFields = z.infer<typeof voiceInputFieldsSchema>;

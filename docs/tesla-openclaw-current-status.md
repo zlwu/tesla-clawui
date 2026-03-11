@@ -49,12 +49,27 @@
 2. `Qwen ASR`
 3. 生产模式下首页与 API 同样可用
 4. 本地 OpenClaw Gateway HTTP chat endpoint 已完成真实 `/api/text/input` 联调
+5. `npm run smoke:openclaw` 已完成真实 OpenClaw 主链路验证
 
 当前推荐 LLM 主链路为：
 
 1. `OpenClaw Gateway LLM`
 2. `Qwen ASR`
 3. `OpenRouter LLM` 仅保留为可回退路径
+
+当前登录门禁为：
+
+1. `.env` 驱动的 shared PIN
+2. 前端先输入 6 位 PIN 解锁
+3. 解锁后再创建和恢复当前设备 session
+4. 当前不提供多用户账号体系
+
+当前 PIN 输入交互已经收口为：
+
+1. 6 格数字输入
+2. 每输入一位自动跳到下一格
+3. Backspace 可回退到上一格
+4. 支持一次性粘贴 6 位数字
 
 ## 接手后本地工程校验
 

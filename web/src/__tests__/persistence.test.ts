@@ -7,6 +7,8 @@ describe('persistence', () => {
     clearPersistedState();
 
     persistSessionState({
+      authToken: 'auth_1',
+      authExpiresAt: '2026-12-31T00:00:00.000Z',
       sessionId: 'sess_1',
       sessionToken: 'token_1',
       messages: [
@@ -23,6 +25,8 @@ describe('persistence', () => {
 
     const restored = readPersistedState();
 
+    expect(restored.authToken).toBe('auth_1');
+    expect(restored.authExpiresAt).toBe('2026-12-31T00:00:00.000Z');
     expect(restored.sessionId).toBe('sess_1');
     expect(restored.sessionToken).toBe('token_1');
     expect(restored.messages).toHaveLength(1);

@@ -14,6 +14,8 @@ describe('server api', () => {
   beforeEach(() => {
     rmSync(testDbPath, { force: true });
     process.env.DATABASE_URL = './server/data/test-openclaw-api.db';
+    process.env.AUTH_ENABLED = 'false';
+    delete process.env.AUTH_SHARED_PIN;
     process.env.LLM_PROVIDER = 'mock';
     process.env.ASR_PROVIDER = 'mock';
   });
@@ -185,6 +187,52 @@ describe('server api', () => {
     expect(streamResponse.body).toContain('event: delta');
     expect(streamResponse.body).toContain('event: done');
     expect(streamResponse.body).toContain('MVP mock 回复');
+
+    await app.close();
+  });
+
+  it('requires shared pin auth before creating a session when auth is enabled', async () => {
+    process.env.AUTH_ENABLED = 'true';
+    process.env.AUTH_SHARED_PIN = '123456';
+
+    const { app } = createApp();
+
+    const blockedResponse = await app.inject({
+      method: 'POST',
+      url: '/api/session/create',
+      payload: {
+        device: { type: 'tesla-browser', label: 'tesla-mcu2' },
+      },
+    });
+    expect(blockedResponse.statusCode).toBe(401);
+    expect(blockedResponse.body).toContain('AUTH_REQUIRED');
+
+    const authConfigResponse = await app.inject({
+      method: 'GET',
+      url: '/api/auth/config',
+    });
+    expect(authConfigResponse.statusCode).toBe(200);
+    expect(authConfigResponse.body).toContain('"enabled":true');
+
+    const unlockResponse = await app.inject({
+      method: 'POST',
+      url: '/api/auth/unlock',
+      payload: { pin: '123456' },
+    });
+    expect(unlockResponse.statusCode).toBe(200);
+    const unlockPayload = unlockResponse.json<{ data: { authToken: string } }>();
+
+    const createResponse = await app.inject({
+      method: 'POST',
+      url: '/api/session/create',
+      headers: {
+        'x-app-auth': unlockPayload.data.authToken,
+      },
+      payload: {
+        device: { type: 'tesla-browser', label: 'tesla-mcu2' },
+      },
+    });
+    expect(createResponse.statusCode).toBe(200);
 
     await app.close();
   });

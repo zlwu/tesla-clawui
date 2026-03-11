@@ -57,6 +57,20 @@ describe('renderApp', () => {
     expect(root.querySelector<HTMLTextAreaElement>('#text-input')?.placeholder).toContain('系统语音输入');
   });
 
+  it('renders a PIN unlock screen when auth is required', () => {
+    const root = document.createElement('div');
+    const state = createInitialState();
+    state.authEnabled = true;
+    state.authRequired = true;
+    state.pinDraft = '123';
+
+    renderApp(root, state);
+
+    expect(root.querySelectorAll('.auth-pin-digit')).toHaveLength(6);
+    expect(root.querySelector('#unlock-button')).not.toBeNull();
+    expect(root.textContent).toContain('输入 6 位 PIN');
+  });
+
   it('renders draft text and recover button in error state', () => {
     const root = document.createElement('div');
     const state = createInitialState();

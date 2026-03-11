@@ -13,6 +13,8 @@ const createConfig = (): AppConfig => ({
   databaseUrl: '/tmp/openclaw-test.db',
   uploadDir: '/tmp',
   sessionTokenBytes: 24,
+  authEnabled: false,
+  authSessionDays: 90,
   messageLimitDefault: 8,
   messageLimitMax: 20,
   llmProvider: 'mock',

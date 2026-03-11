@@ -1,24 +1,30 @@
 import type {
+  AuthConfigResponse,
   ApiFailure,
   ApiResponse,
   CreateSessionResponse,
   MessagesResponse,
   TextInputResponse,
+  UnlockResponse,
   VoiceInputResponse,
 } from '@tesla-openclaw/shared';
 import {
   apiErrorResponseSchema,
   apiSuccessSchema,
+  authConfigResponseSchema,
   createSessionResponseSchema,
   messagesResponseSchema,
   textInputResponseSchema,
+  unlockResponseSchema,
   voiceInputResponseSchema,
 } from '@tesla-openclaw/shared';
 
 import { getWebConfig } from './config.js';
 
 const createSessionEnvelopeSchema = apiSuccessSchema(createSessionResponseSchema);
+const authConfigEnvelopeSchema = apiSuccessSchema(authConfigResponseSchema);
 const textInputEnvelopeSchema = apiSuccessSchema(textInputResponseSchema);
+const unlockEnvelopeSchema = apiSuccessSchema(unlockResponseSchema);
 const voiceInputEnvelopeSchema = apiSuccessSchema(voiceInputResponseSchema);
 const messagesEnvelopeSchema = apiSuccessSchema(messagesResponseSchema);
 const webConfig = getWebConfig();
@@ -33,6 +39,14 @@ const networkError = (message: string): ApiFailure => ({
     retryable: true,
   },
 });
+
+const withAppAuth = (headers: HeadersInit, authToken?: string | null): HeadersInit =>
+  authToken
+    ? {
+      ...headers,
+      'x-app-auth': authToken,
+    }
+    : headers;
 
 type TextStreamCallbacks = {
   onStart(): void;
@@ -63,14 +77,33 @@ const safeRequest = async <T>(
   }
 };
 
-export const createSession = async (): Promise<ApiResponse<CreateSessionResponse>> =>
+export const fetchAuthConfig = async (): Promise<ApiResponse<AuthConfigResponse>> =>
+  safeRequest(
+    async () => fetch(toApiUrl('/api/auth/config')),
+    authConfigEnvelopeSchema,
+  );
+
+export const unlockWithPin = async (pin: string): Promise<ApiResponse<UnlockResponse>> =>
   safeRequest(
     async () =>
-      fetch(toApiUrl('/api/session/create'), {
+      fetch(toApiUrl('/api/auth/unlock'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
+        body: JSON.stringify({ pin }),
+      }),
+    unlockEnvelopeSchema,
+  );
+
+export const createSession = async (authToken?: string | null): Promise<ApiResponse<CreateSessionResponse>> =>
+  safeRequest(
+    async () =>
+      fetch(toApiUrl('/api/session/create'), {
+        method: 'POST',
+        headers: withAppAuth({
+          'Content-Type': 'application/json',
+        }, authToken),
         body: JSON.stringify({
           device: {
             type: 'tesla-browser',
@@ -84,13 +117,14 @@ export const createSession = async (): Promise<ApiResponse<CreateSessionResponse
 export const fetchMessages = async (
   sessionId: string,
   sessionToken: string,
+  authToken?: string | null,
 ): Promise<ApiResponse<MessagesResponse>> =>
   safeRequest(
     async () =>
       fetch(toApiUrl(`/api/messages?sessionId=${encodeURIComponent(sessionId)}&limit=8`), {
-        headers: {
+        headers: withAppAuth({
           Authorization: `Bearer ${sessionToken}`,
-        },
+        }, authToken),
       }),
     messagesEnvelopeSchema,
   );
@@ -98,6 +132,7 @@ export const fetchMessages = async (
 export const sendTextMessage = async (params: {
   sessionId: string;
   sessionToken: string;
+  authToken?: string | null;
   text: string;
   requestId: string;
 }): Promise<ApiResponse<TextInputResponse>> =>
@@ -105,10 +140,10 @@ export const sendTextMessage = async (params: {
     async () =>
       fetch(toApiUrl('/api/text/input'), {
         method: 'POST',
-        headers: {
+        headers: withAppAuth({
           'Content-Type': 'application/json',
           Authorization: `Bearer ${params.sessionToken}`,
-        },
+        }, params.authToken),
         body: JSON.stringify({
           sessionId: params.sessionId,
           text: params.text,
@@ -202,6 +237,7 @@ const parseSsePayload = async <T>(response: Response, callbacks: TextStreamCallb
 export const sendTextMessageStream = async (params: {
   sessionId: string;
   sessionToken: string;
+  authToken?: string | null;
   text: string;
   requestId: string;
   onStart(): void;
@@ -210,10 +246,10 @@ export const sendTextMessageStream = async (params: {
   try {
     const response = await fetch(toApiUrl('/api/text/input/stream'), {
       method: 'POST',
-      headers: {
+      headers: withAppAuth({
         'Content-Type': 'application/json',
         Authorization: `Bearer ${params.sessionToken}`,
-      },
+      }, params.authToken),
       body: JSON.stringify({
         sessionId: params.sessionId,
         text: params.text,
@@ -242,6 +278,7 @@ export const sendTextMessageStream = async (params: {
 export const sendVoiceMessage = async (params: {
   sessionId: string;
   sessionToken: string;
+  authToken?: string | null;
   requestId: string;
   blob: Blob;
   mimeType: string;
@@ -258,9 +295,9 @@ export const sendVoiceMessage = async (params: {
     async () =>
       fetch(toApiUrl('/api/voice/input'), {
         method: 'POST',
-        headers: {
+        headers: withAppAuth({
           Authorization: `Bearer ${params.sessionToken}`,
-        },
+        }, params.authToken),
         body: formData,
       }),
     voiceInputEnvelopeSchema,

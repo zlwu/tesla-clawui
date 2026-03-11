@@ -9,11 +9,13 @@ import { createDb } from './db/client.js';
 import { loadConfig } from './lib/config.js';
 import { AppException, toErrorResponse } from './lib/errors.js';
 import { createLoggerOptions } from './lib/logger.js';
+import { authRoutes } from './routes/auth.js';
 import { healthRoutes } from './routes/health.js';
 import { messagesRoutes } from './routes/messages.js';
 import { sessionRoutes } from './routes/session.js';
 import { textRoutes } from './routes/text.js';
 import { voiceRoutes } from './routes/voice.js';
+import { AuthService } from './services/auth-service.js';
 import { AsrService } from './services/asr-service.js';
 import { AudioFileService } from './services/audio-file-service.js';
 import { LlmService } from './services/llm-service.js';
@@ -26,6 +28,7 @@ import { VoiceService } from './services/voice-service.js';
 declare module 'fastify' {
   interface FastifyInstance {
     services: {
+      authService: AuthService;
       sessionService: SessionService;
       messageService: MessageService;
       textService: TextService;
@@ -45,6 +48,7 @@ export const createApp = () => {
   const config = loadConfig();
   const { db, sqlite } = createDb();
 
+  const authService = new AuthService(config);
   const sessionService = new SessionService(db, config);
   const messageService = new MessageService(db);
   const requestLogService = new RequestLogService(db);
@@ -68,6 +72,7 @@ export const createApp = () => {
 
   const app = Fastify({ logger: createLoggerOptions() });
   app.decorate('services', {
+    authService,
     sessionService,
     messageService,
     textService,
@@ -76,6 +81,31 @@ export const createApp = () => {
 
   app.addHook('onRequest', async (request, reply) => {
     reply.header('x-request-id', request.id);
+  });
+
+  app.addHook('preHandler', (request, _reply, done) => {
+    if (!request.url.startsWith('/api/')) {
+      done();
+      return;
+    }
+
+    if (
+      request.url === '/api/health' ||
+      request.url === '/api/auth/config' ||
+      request.url === '/api/auth/unlock'
+    ) {
+      done();
+      return;
+    }
+
+    try {
+      const authHeader = request.headers['x-app-auth'];
+      const authToken = Array.isArray(authHeader) ? authHeader[0] : authHeader;
+      authService.verifyAccess(authToken);
+      done();
+    } catch (error) {
+      done(error as Error);
+    }
   });
 
   app.addHook('onClose', () => {
@@ -123,6 +153,7 @@ export const createApp = () => {
     root: webDistDir,
     prefix: '/',
   });
+  void app.register(authRoutes);
   void app.register(healthRoutes);
   void app.register(sessionRoutes);
   void app.register(textRoutes);

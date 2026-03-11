@@ -12,6 +12,8 @@ export const appStatusSchema = z.enum([
 export const messageRoleSchema = z.enum(['user', 'assistant', 'system']);
 export const messageSourceSchema = z.enum(['text', 'voice_asr', 'llm', 'system']);
 export const appErrorCodeSchema = z.enum([
+  'AUTH_REQUIRED',
+  'AUTH_INVALID_PIN',
   'SESSION_NOT_FOUND',
   'SESSION_EXPIRED',
   'SESSION_UNAUTHORIZED',
@@ -69,6 +71,21 @@ export const createSessionRequestSchema = z.object({
 export const createSessionResponseSchema = z.object({
   session: sessionSchema,
   sessionToken: z.string(),
+});
+
+export const authConfigResponseSchema = z.object({
+  enabled: z.boolean(),
+  pinLength: z.number().int().min(4).max(12),
+  sessionDays: z.number().int().positive(),
+});
+
+export const unlockRequestSchema = z.object({
+  pin: z.string().trim().regex(/^\d{6}$/),
+});
+
+export const unlockResponseSchema = z.object({
+  authToken: z.string(),
+  expiresAt: z.string().datetime(),
 });
 
 export const textInputRequestSchema = z.object({

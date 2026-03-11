@@ -6,6 +6,12 @@ export type RetryAction =
   | { kind: 'send-voice'; requestId: string; blob: Blob; mimeType: string; language: string };
 
 export type AppState = {
+  authEnabled: boolean;
+  authRequired: boolean;
+  authToken: string | null;
+  authExpiresAt: string | null;
+  pinDraft: string;
+  isUnlocking: boolean;
   sessionId: string | null;
   sessionToken: string | null;
   status: AppStatus;
@@ -20,6 +26,12 @@ export type AppState = {
 };
 
 export const createInitialState = (): AppState => ({
+  authEnabled: false,
+  authRequired: false,
+  authToken: null,
+  authExpiresAt: null,
+  pinDraft: '',
+  isUnlocking: false,
   sessionId: null,
   sessionToken: null,
   status: 'idle',

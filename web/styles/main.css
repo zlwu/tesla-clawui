@@ -34,6 +34,76 @@ body {
   grid-template-rows: auto minmax(0, 1fr) auto;
 }
 
+.shell-auth {
+  place-items: center;
+}
+
+.auth-card {
+  width: min(100%, 720px);
+  padding: 28px 24px;
+  display: grid;
+  gap: 18px;
+  border: 1px solid #d9d9e3;
+  border-radius: 28px;
+  background: #fff;
+  box-shadow: 0 14px 40px rgba(32, 33, 35, 0.12);
+}
+
+.auth-copy {
+  margin: 0;
+  color: #6e6e80;
+  font-size: 22px;
+  line-height: 1.45;
+}
+
+.auth-row {
+  justify-content: center;
+}
+
+.auth-pin-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.auth-pin-digit {
+  width: 100%;
+  min-height: 72px;
+  padding: 0;
+  border: 1px solid #d9d9e3;
+  border-radius: 20px;
+  outline: none;
+  background: #f7f7f8;
+  color: #202123;
+  font-size: clamp(30px, 4vw, 40px);
+  font-weight: 700;
+  text-align: center;
+}
+
+.auth-pin-digit:focus {
+  border-color: #202123;
+  box-shadow: 0 0 0 3px rgba(32, 33, 35, 0.12);
+}
+
+.auth-button {
+  min-width: 120px;
+  height: 56px;
+  padding: 0 18px;
+  background: #202123;
+  color: #fff;
+  font-size: 18px;
+}
+
+.auth-meta {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.auth-error {
+  text-align: left;
+}
+
 .app-header {
   display: flex;
   align-items: flex-start;
@@ -366,6 +436,11 @@ body {
 
   .composer-row {
     grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .auth-meta {
+    flex-direction: column;
+    align-items: flex-start;
   }
 
   .send-icon-button {

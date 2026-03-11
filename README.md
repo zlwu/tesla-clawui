@@ -18,6 +18,8 @@
 - 文本主链路已支持 SSE streaming，assistant 回复可边输出边显示
 - assistant 消息已支持受控 Markdown 子集渲染：标题、列表、引用、粗体、行内代码、代码块
 - 消息区与输入区布局已收口为真实占位底栏；初始进入和流式输出默认定位到最新消息
+- 已支持基于 `.env` 的 shared PIN 门禁，解锁后再进入当前 Tesla 会话
+- PIN 解锁输入已收口为 6 格数字输入，支持自动跳位、回退和一次性粘贴
 - 开发态与生产态都已验证可由 Fastify 单服务统一托管页面与 API
 - 本地接手校验已通过：`npm run lint`、`npm run typecheck`、`npm test`、`npm run build`
 - Tesla 真机主链路验证已通过，当前结论为 `Proceed with Caveats`
@@ -51,6 +53,7 @@
 - 示例配置见 `.env.example`
 - 默认同源访问 `/api`
 - 如果前端需要直连其他 API 域名，可设置 `VITE_API_BASE_URL`
+- 如需启用 shared PIN 门禁，可设置 `AUTH_ENABLED=true`、`AUTH_SHARED_PIN=6位数字PIN`
 - 当前推荐 LLM 配置为 `LLM_PROVIDER=openclaw`
 - OpenClaw 使用 `LLM_BASE_URL`、`LLM_API_KEY`、`LLM_MODEL`，可选 `OPENCLAW_AGENT_ID`
 
@@ -90,6 +93,7 @@ npm run smoke:openclaw
 - TTS、手机端协同、WebSocket 都不在 MVP
 - 当前已落地的流式能力限定为文本 SSE streaming，不扩展为 WebSocket 对话架构
 - Markdown 渲染当前仅限 assistant 消息的受控子集，不支持 HTML 直通、表格、图片和复杂嵌套语法
+- 当前登录能力仅为 shared PIN 门禁，不是多用户账号体系；适合单环境 / 小范围固定用户使用
 - Tesla 真机当前结论为 `Proceed with Caveats`，仍可继续按 `docs/tesla-openclaw-mvp-validation-plan.md` 补充后续回归与优化验证
 - Tesla 真机网页麦克风权限不可用，因此首版真机主路径改为系统语音输入法 / 长按系统语音键输入
 - `cloudflared`/临时公网隧道只用于测试，不属于正式产品方案

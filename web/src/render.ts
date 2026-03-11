@@ -43,6 +43,44 @@ const micIcon = () => `
 `;
 
 export const renderApp = (root: HTMLElement, state: AppState): void => {
+  if (state.authEnabled && state.authRequired) {
+    const pinDigits = Array.from({ length: 6 }, (_, index) => escapeHtml(state.pinDraft[index] ?? ''));
+    root.innerHTML = `
+      <main class="shell shell-auth">
+        <section class="auth-card">
+          <div class="app-title">OpenClaw</div>
+          <p class="auth-copy">输入 6 位 PIN 码后继续使用当前 Tesla 会话。</p>
+          <div class="auth-pin-grid" role="group" aria-label="PIN 输入">
+            ${pinDigits
+              .map(
+                (digit, index) => `
+                  <input
+                    class="auth-pin-digit"
+                    data-pin-index="${index}"
+                    inputmode="numeric"
+                    autocomplete="${index === 0 ? 'one-time-code' : 'off'}"
+                    pattern="[0-9]*"
+                    maxlength="1"
+                    value="${digit}"
+                    aria-label="PIN 第 ${index + 1} 位"
+                  />
+                `,
+              )
+              .join('')}
+          </div>
+          <div class="composer-row auth-row">
+            <button id="unlock-button" class="icon-button auth-button" ${state.isUnlocking || state.pinDraft.length !== 6 ? 'disabled' : ''}>${state.isUnlocking ? '解锁中…' : '解锁'}</button>
+          </div>
+          <div class="auth-meta">
+            <span class="status-pill">${state.networkOnline ? '网络在线' : '网络离线'}</span>
+            <span class="error-text auth-error">${state.error ?? ''}</span>
+          </div>
+        </section>
+      </main>
+    `;
+    return;
+  }
+
   const messageItems = state.messages
     .map(
       (message) => `
