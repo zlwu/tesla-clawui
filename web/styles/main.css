@@ -22,6 +22,8 @@ body {
 
 #app {
   --keyboard-offset: 0px;
+  --keyboard-fallback-offset: 0px;
+  --composer-bottom-offset: calc(var(--keyboard-offset) + var(--keyboard-fallback-offset));
 }
 
 .shell {
@@ -139,8 +141,8 @@ body {
   gap: 8px;
   overflow-y: auto;
   min-height: 0;
-  padding: 4px 0 12px;
-  scroll-padding-bottom: 24px;
+  padding: 4px 0 calc(12px + var(--composer-bottom-offset));
+  scroll-padding-bottom: calc(24px + var(--composer-bottom-offset));
 }
 
 .message {
@@ -302,7 +304,7 @@ body {
   width: min(100%, 860px);
   margin: 0 auto;
   padding: 10px 12px 12px;
-  margin-bottom: var(--keyboard-offset);
+  margin-bottom: var(--composer-bottom-offset);
   border: 1px solid #d9d9e3;
   border-radius: 28px;
   background: #fff;

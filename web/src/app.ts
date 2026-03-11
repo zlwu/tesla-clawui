@@ -14,6 +14,7 @@ const createRequestId = (prefix: string): string =>
 
 export class TeslaOpenClawApp {
   private readonly persistedState = readPersistedState();
+  private readonly keyboardFallbackDelayMs = 180;
   private readonly state: AppState = {
     ...createInitialState(),
     authToken: this.persistedState.authToken,
@@ -30,6 +31,7 @@ export class TeslaOpenClawApp {
   private lastButtonAction: { id: string; at: number } | null = null;
   private shouldAutoScrollMessages = true;
   private pendingInitialScroll = true;
+  private keyboardFallbackTimerId: number | null = null;
 
   public constructor(private readonly root: HTMLElement) {}
 
@@ -191,6 +193,7 @@ export class TeslaOpenClawApp {
 
       this.keyboardMode = true;
       this.syncKeyboardViewport();
+      this.scheduleKeyboardFallbackCheck();
       window.setTimeout(() => {
         this.scrollComposerIntoView();
       }, 120);
@@ -203,6 +206,7 @@ export class TeslaOpenClawApp {
       }
 
       this.keyboardMode = false;
+      this.clearKeyboardFallbackCheck();
       this.syncKeyboardViewport();
     });
 
@@ -212,7 +216,25 @@ export class TeslaOpenClawApp {
       }
 
       this.syncKeyboardViewport();
+      this.scheduleKeyboardFallbackCheck();
       this.scrollComposerIntoView();
+    });
+
+    window.visualViewport?.addEventListener('scroll', () => {
+      if (!this.keyboardMode) {
+        return;
+      }
+
+      this.syncKeyboardViewport();
+    });
+
+    window.addEventListener('resize', () => {
+      if (!this.keyboardMode) {
+        return;
+      }
+
+      this.syncKeyboardViewport();
+      this.scheduleKeyboardFallbackCheck();
     });
   }
 
@@ -306,9 +328,14 @@ export class TeslaOpenClawApp {
       this.keyboardMode && visualViewport
         ? Math.max(window.innerHeight - visualViewport.height - visualViewport.offsetTop, 0)
         : 0;
+    const keyboardFallbackOffset = this.getKeyboardFallbackOffset(keyboardOffset);
 
     this.root.style.setProperty('--keyboard-offset', `${keyboardOffset}px`);
-    this.root.classList.toggle('keyboard-active', this.keyboardMode || keyboardOffset > 0);
+    this.root.style.setProperty('--keyboard-fallback-offset', `${keyboardFallbackOffset}px`);
+    this.root.classList.toggle(
+      'keyboard-active',
+      this.keyboardMode || keyboardOffset > 0 || keyboardFallbackOffset > 0,
+    );
   }
 
   private scrollMessagesToBottom(options?: { force?: boolean }): void {
@@ -338,7 +365,46 @@ export class TeslaOpenClawApp {
 
   private scrollComposerIntoView(): void {
     const composer = this.root.querySelector<HTMLElement>('.composer');
-    composer?.scrollIntoView({ block: 'nearest' });
+    composer?.scrollIntoView({ block: 'end' });
+  }
+
+  private scheduleKeyboardFallbackCheck(): void {
+    this.clearKeyboardFallbackCheck();
+    this.keyboardFallbackTimerId = window.setTimeout(() => {
+      this.keyboardFallbackTimerId = null;
+      this.syncKeyboardViewport();
+      this.scrollComposerIntoView();
+      this.scrollMessagesToBottom();
+    }, this.keyboardFallbackDelayMs);
+  }
+
+  private clearKeyboardFallbackCheck(): void {
+    if (this.keyboardFallbackTimerId === null) {
+      return;
+    }
+
+    window.clearTimeout(this.keyboardFallbackTimerId);
+    this.keyboardFallbackTimerId = null;
+  }
+
+  private getKeyboardFallbackOffset(keyboardOffset: number): number {
+    if (!this.keyboardMode || keyboardOffset > 24 || !this.shouldUseTouchKeyboardFallback()) {
+      return 0;
+    }
+
+    return Math.min(Math.max(Math.round(window.innerHeight * 0.36), 220), 320);
+  }
+
+  private shouldUseTouchKeyboardFallback(): boolean {
+    if (typeof window === 'undefined') {
+      return false;
+    }
+
+    return (
+      navigator.maxTouchPoints > 0
+      || window.matchMedia('(pointer: coarse)').matches
+      || 'ontouchstart' in window
+    );
   }
 
   private syncComposerInputHeight(): void {
