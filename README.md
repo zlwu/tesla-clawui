@@ -66,48 +66,9 @@
 
 ## Coolify 部署
 
-推荐直接使用 Coolify 的 Nixpacks 构建，不必单独写 Dockerfile。
+推荐直接使用仓库内的 `Dockerfile` 部署到 Coolify。
 详细步骤见 `docs/tesla-openclaw-coolify-deploy.md`。
-仓库已提供 `nixpacks.toml`，用于固定 install/build/start 阶段，避免默认 `npm ci` 构建差异。
-
-建议配置：
-
-- Build Command: `npm install && npm run build`
-- Start Command: `npm run start`
-- Port: `3000`
-- Health Check: `/api/health`
-
-建议挂载持久卷：
-
-- `/app/server/data`
-- `/app/server/uploads`
-
-对应环境变量建议：
-
-- `HOST=0.0.0.0`
-- `PORT=3000`
-- `DATABASE_URL=./server/data/openclaw.db`
-- `UPLOAD_DIR=./server/uploads`
-- `AUTH_ENABLED=true`
-- `AUTH_SHARED_PIN=<6位正式PIN>`
-- `AUTH_SESSION_DAYS=90`
-- `AUTH_TOKEN_SECRET=<高强度随机值>`
-- `LLM_PROVIDER=openclaw`
-- `LLM_BASE_URL=<VPS 上 OpenClaw Gateway 地址>`
-- `LLM_API_KEY=<生产 token>`
-- `LLM_MODEL=openclaw`
-- `OPENCLAW_AGENT_ID=main`
-- `ASR_PROVIDER=qwen`
-- `ASR_BASE_URL=https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation`
-- `ASR_API_KEY=<生产 key>`
-- `ASR_MODEL=qwen3-asr-flash`
-
-上线后最小检查建议：
-
-1. 打开首页能看到 PIN 解锁页
-2. 输入 PIN 后能进入聊天界面
-3. `/api/health` 返回 200
-4. 发送一条文本后能收到 OpenClaw 回复
+仓库已提供 `Dockerfile` 与 `.dockerignore`，可以直接交给 Coolify 构建。
 
 ## 冒烟清单
 

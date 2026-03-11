@@ -4,7 +4,7 @@
 
 - 单节点 VPS
 - Coolify 托管
-- 使用 Nixpacks 构建
+- 使用 Dockerfile 构建
 - Fastify 单服务同时托管前端页面和 API
 
 ## 推荐部署形态
@@ -17,11 +17,19 @@
 ## Coolify 基本配置
 
 - Source：当前 Git 仓库
-- Build Pack：`Nixpacks`
-- Build Command：`npm install && npm run build`
-- Start Command：`npm run start`
+- Build Pack：`Dockerfile`
+- Dockerfile：仓库根目录 `Dockerfile`
 - Port：`3000`
 - Health Check Path：`/api/health`
+
+不建议继续优先使用 Nixpacks，因为当前项目已经涉及：
+
+- monorepo workspaces
+- `better-sqlite3` 原生依赖
+- SQLite 持久化目录
+- 明确的生产启动链路
+
+这些场景下 Dockerfile 的行为更稳定、更容易排错。
 
 ## 持久化挂载
 
@@ -66,13 +74,13 @@
 如果 OpenClaw Gateway 和应用都在同一台 VPS：
 
 - 不要优先暴露 OpenClaw 到公网
-- 优先使用容器内网地址或主机内网地址
+- 优先使用容器内可达的宿主机地址
 - 应用只需要能访问 `/v1/chat/completions`
 
 例如：
 
 - `LLM_BASE_URL=http://openclaw:18789/v1/chat/completions`
-- 或 `LLM_BASE_URL=http://127.0.0.1:18789/v1/chat/completions`
+- 或 `LLM_BASE_URL=http://172.17.0.1:18789/v1/chat/completions`
 
 实际取决于 Coolify 中 OpenClaw 的部署方式。
 

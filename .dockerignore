@@ -1,0 +1,17 @@
+.git
+.github
+node_modules
+packages/*/node_modules
+server/node_modules
+web/node_modules
+dist
+coverage
+.turbo
+.vite
+*.log
+.env
+.env.local
+server/data
+server/uploads
+packages/shared/tsconfig.tsbuildinfo
+CLAUDE.md
