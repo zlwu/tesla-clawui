@@ -68,6 +68,7 @@
 
 推荐直接使用 Coolify 的 Nixpacks 构建，不必单独写 Dockerfile。
 详细步骤见 `docs/tesla-openclaw-coolify-deploy.md`。
+仓库已提供 `nixpacks.toml`，用于固定 install/build/start 阶段，避免默认 `npm ci` 构建差异。
 
 建议配置：
 
