@@ -26,6 +26,8 @@ export class TeslaOpenClawApp {
   private lastRenderSignature: string | null = null;
   private keyboardMode = false;
   private lastButtonAction: { id: string; at: number } | null = null;
+  private shouldAutoScrollMessages = true;
+  private pendingInitialScroll = true;
 
   public constructor(private readonly root: HTMLElement) {}
 
@@ -107,6 +109,19 @@ export class TeslaOpenClawApp {
       this.syncComposerDraftState();
     });
 
+    this.root.addEventListener(
+      'scroll',
+      (event) => {
+        const target = event.target;
+        if (!(target instanceof HTMLElement) || !target.classList.contains('messages')) {
+          return;
+        }
+
+        this.shouldAutoScrollMessages = this.isNearMessagesBottom(target);
+      },
+      true,
+    );
+
     window.addEventListener('online', () => {
       this.state.networkOnline = true;
       this.render();
@@ -163,14 +178,12 @@ export class TeslaOpenClawApp {
     this.lastRenderSignature = nextSignature;
     renderApp(this.root, viewState);
 
-    const messagesNode = this.root.querySelector<HTMLElement>('.messages');
-    if (messagesNode) {
-      messagesNode.scrollTop = messagesNode.scrollHeight;
-    }
-
     this.syncComposerInputHeight();
-
     this.syncKeyboardViewport();
+    if (this.pendingInitialScroll || this.shouldAutoScrollMessages) {
+      this.scrollMessagesToBottom({ force: this.pendingInitialScroll });
+      this.pendingInitialScroll = false;
+    }
   }
 
   private setStatus(next: AppStatus): void {
@@ -190,6 +203,31 @@ export class TeslaOpenClawApp {
 
     this.root.style.setProperty('--keyboard-offset', `${keyboardOffset}px`);
     this.root.classList.toggle('keyboard-active', this.keyboardMode || keyboardOffset > 0);
+  }
+
+  private scrollMessagesToBottom(options?: { force?: boolean }): void {
+    const messagesNode = this.root.querySelector<HTMLElement>('.messages');
+    if (!messagesNode) {
+      return;
+    }
+
+    if (!options?.force && !this.shouldAutoScrollMessages) {
+      return;
+    }
+
+    messagesNode.scrollTop = messagesNode.scrollHeight;
+
+    window.requestAnimationFrame(() => {
+      const latestMessage = messagesNode.lastElementChild as HTMLElement | null;
+      latestMessage?.scrollIntoView({ block: 'end' });
+      messagesNode.scrollTop = messagesNode.scrollHeight;
+    });
+  }
+
+  private isNearMessagesBottom(messagesNode: HTMLElement): boolean {
+    const distanceToBottom =
+      messagesNode.scrollHeight - messagesNode.scrollTop - messagesNode.clientHeight;
+    return distanceToBottom <= 48;
   }
 
   private scrollComposerIntoView(): void {
@@ -297,6 +335,8 @@ export class TeslaOpenClawApp {
     this.state.error = null;
     this.state.errorCode = null;
     this.state.retryAction = null;
+    this.pendingInitialScroll = true;
+    this.shouldAutoScrollMessages = true;
     this.persistState();
     this.render();
   }
@@ -335,6 +375,7 @@ export class TeslaOpenClawApp {
       optimisticUserMessage,
       optimisticAssistantMessage,
     ]);
+    this.shouldAutoScrollMessages = true;
     this.state.draftText = '';
     this.state.isSendingText = true;
     this.state.status = 'thinking';
@@ -473,6 +514,7 @@ export class TeslaOpenClawApp {
       result.data.userMessage,
       result.data.assistantMessage,
     ]);
+    this.shouldAutoScrollMessages = true;
     this.state.status = 'idle';
     this.state.error = null;
     this.state.errorCode = null;
@@ -534,6 +576,7 @@ export class TeslaOpenClawApp {
       optimisticUserMessage,
       optimisticAssistantMessage,
     ]);
+    this.shouldAutoScrollMessages = true;
     this.state.draftText = '';
     this.state.isSendingText = true;
     this.state.status = 'thinking';
@@ -590,6 +633,7 @@ export class TeslaOpenClawApp {
   }
 
   private updateOptimisticAssistantMessage(requestId: string, delta: string): void {
+    this.shouldAutoScrollMessages = true;
     this.state.messages = this.state.messages.map((message) =>
       message.messageId === `local_assistant_${requestId}`
         ? {
@@ -625,6 +669,7 @@ export class TeslaOpenClawApp {
     }
 
     this.state.messages = limitMessages(messages);
+    this.shouldAutoScrollMessages = true;
   }
 
   private startVoiceProgressIndicators(): void {

@@ -50,6 +50,7 @@ Tesla OpenClaw 项目的后续开发必须遵守以下规则。
 - `T4.6` Tesla 真机验证已完成，当前结论为 `Proceed with Caveats`
 - 文本主链路已支持 SSE streaming
 - assistant 消息已支持受控 Markdown 子集渲染
+- 消息区与 composer 已收口为真实占位布局，默认定位到最新消息
 
 ## 当前已验证结论
 
@@ -66,4 +67,5 @@ Tesla OpenClaw 项目的后续开发必须遵守以下规则。
 - 先补文档再扩功能时，要同步更新 `README.md`
 - 涉及文本输出体验时，默认建立在现有 SSE streaming 主链路之上，不回退到轮询或 WebSocket 重构
 - Markdown 渲染只允许做受控子集增强；不要引入完整富文本、HTML 直通、表格图片等复杂能力
+- 涉及消息滚动与输入区布局时，优先保持 composer 真实占位，不要回退到覆盖式浮层模型
 - 如果只是为了临时 Tesla 外网访问，可使用 `cloudflared` quick tunnel；不要把它写成产品正式依赖

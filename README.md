@@ -17,6 +17,7 @@
 - 本地 OpenClaw Gateway HTTP chat endpoint 已完成真实 `/api/text/input` 联调
 - 文本主链路已支持 SSE streaming，assistant 回复可边输出边显示
 - assistant 消息已支持受控 Markdown 子集渲染：标题、列表、引用、粗体、行内代码、代码块
+- 消息区与输入区布局已收口为真实占位底栏；初始进入和流式输出默认定位到最新消息
 - 开发态与生产态都已验证可由 Fastify 单服务统一托管页面与 API
 - 本地接手校验已通过：`npm run lint`、`npm run typecheck`、`npm test`、`npm run build`
 - Tesla 真机主链路验证已通过，当前结论为 `Proceed with Caveats`
@@ -24,6 +25,7 @@
 - 当前真机 UI 重写设计见 `docs/tesla-openclaw-client-ui-design.md`
 - Tesla 真机主输入路径已调整为：系统语音输入法 / 长按系统语音键输入 -> 文本框 -> 发送
 - 当前输入区已收口为：单一 composer、右侧发送按钮、次级麦克风工具位
+- 当前消息滚动策略已收口为：初始定位到底部、streaming 默认跟随、用户手动上滑后停止强制跟随
 - 当前已知真机瑕疵：输入框仍会被输入面板部分遮挡
 
 ## 目录
