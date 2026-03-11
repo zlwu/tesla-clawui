@@ -7,6 +7,7 @@
 - Phase 2：完成
 - Phase 3：完成
 - Phase 4：完成
+- 网页录音 / ASR 主链路：已移除
 - 本地 Chromium 验证：完成
 - 生产模式本地验证：完成
 - Tesla 真机验证：主链路通过（带瑕疵）
@@ -15,8 +16,7 @@
 
 - 创建 session
 - 文本输入闭环
-- 语音上传闭环
-- 真实 ASR -> 真实 LLM 主链路
+- 真实 OpenClaw LLM 主链路
 - 最近消息恢复
 - 显式前端状态机
 - 错误码统一
@@ -27,7 +27,6 @@
 - 开发态统一入口 `npm run dev`
 - 单一底部 composer 输入区
 - 发送按钮固定在输入框右侧
-- 麦克风按钮已降级为次级工具位
 - 系统语音输入提示已并入输入框 placeholder
 
 ## 本地已验证项
@@ -37,25 +36,22 @@
 1. 页面可打开
 2. session 可自动建立
 3. 文本消息可发送并收到回复
-4. 语音录音可上传并返回 transcript 与回复
-5. 连续多轮上下文正常
-6. 刷新后最近消息仍可恢复
-7. 断网后会进入错误态
-8. 恢复网络后可点击“重试上一步”
+4. 连续多轮上下文正常
+5. 刷新后最近消息仍可恢复
+6. 断网后会进入错误态
+7. 恢复网络后可点击“重试上一步”
 
 本地真实 provider 已验证通过：
 
 1. `OpenRouter LLM`
-2. `Qwen ASR`
-3. 生产模式下首页与 API 同样可用
-4. 本地 OpenClaw Gateway HTTP chat endpoint 已完成真实 `/api/text/input` 联调
-5. `npm run smoke:openclaw` 已完成真实 OpenClaw 主链路验证
+2. 生产模式下首页与 API 同样可用
+3. 本地 OpenClaw Gateway HTTP chat endpoint 已完成真实 `/api/text/input` 联调
+4. `npm run smoke:openclaw` 已完成真实 OpenClaw 主链路验证
 
 当前推荐 LLM 主链路为：
 
 1. `OpenClaw Gateway LLM`
-2. `Qwen ASR`
-3. `OpenRouter LLM` 仅保留为可回退路径
+2. `OpenRouter LLM` 仅保留为可回退路径
 
 当前登录门禁为：
 
@@ -97,6 +93,7 @@ Tesla 真机上已经确认：
 ```
 
 网页内录音在 Tesla 真机上不再视为首要验证前提。
+当前代码主线已经彻底移除网页录音按钮、语音上传接口与 ASR 配置要求。
 
 ## 当前真机结论
 
@@ -117,9 +114,8 @@ Tesla 真机上已经确认：
 
 1. 底部单一 composer
 2. 发送按钮固定在输入框最右侧
-3. 麦克风按钮移到次级工具位，避免与发送按钮误触竞争
-4. 系统语音输入提示整合进输入框 placeholder
-5. 头部副标题已移除，避免焦点切换时的视觉抖动
+3. 系统语音输入提示整合进输入框 placeholder
+4. 头部副标题已移除，避免焦点切换时的视觉抖动
 
 当前消息区滚动与布局也已经收口为：
 
@@ -140,4 +136,4 @@ Tesla 真机上已经确认：
 1. 文本 SSE streaming 已完成，assistant 回复支持边输出边显示
 2. assistant 消息的受控 Markdown 子集渲染已完成，当前优先保证安全和可读性，不扩展为完整富文本
 3. Tesla 键盘避让兼容已进入代码主线，下一步以真机回归为主
-4. 不再以网页内录音能力作为 Tesla 真机首版前提
+4. 不再以网页内录音能力作为 Tesla 真机首版前提，项目主线固定为系统语音输入法 + 文本发送

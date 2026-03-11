@@ -7,7 +7,6 @@ const createConfig = (): AppConfig => ({
   port: 3000,
   host: '0.0.0.0',
   databaseUrl: '/tmp/openclaw-test.db',
-  uploadDir: '/tmp',
   sessionTokenBytes: 24,
   authEnabled: false,
   authSessionDays: 90,
@@ -18,8 +17,6 @@ const createConfig = (): AppConfig => ({
   llmApiKey: 'gateway-token',
   llmModel: 'openclaw',
   openclawAgentId: 'main',
-  asrProvider: 'mock',
-  asrModel: 'whisper-1',
 });
 
 describe('OpenClawProvider', () => {

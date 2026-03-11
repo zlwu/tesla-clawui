@@ -21,7 +21,7 @@ Tesla OpenClaw 项目的后续开发必须遵守以下规则。
 
 - 目标设备是 Tesla 老款 Atom / MCU2 浏览器
 - Tesla 单端优先
-- 语音输入是主入口
+- 系统语音输入法是主入口，网页录音不进入主线
 - 大字文本多轮显示是主输出
 - TTS 不是首版主链路
 - 手机端协同不进入 MVP
@@ -58,10 +58,10 @@ Tesla OpenClaw 项目的后续开发必须遵守以下规则。
 ## 当前已验证结论
 
 - 本地浏览器验证通过：页面加载、session 创建、文本发送、刷新恢复、弱网手动重试
-- 真实 provider 联调已通过：`Qwen ASR + OpenClaw Gateway LLM`
+- 真实 provider 联调已通过：`OpenClaw Gateway LLM`
 - 本地 OpenClaw Gateway HTTP chat endpoint 已完成真实 `/api/text/input` 联调
 - `npm run smoke:openclaw` 已通过真实 OpenClaw Gateway 主链路验证
-- 语音浏览器真录音未在本地 headless 浏览器完成，因为没有真实麦克风设备
+- Tesla 真机已确认网页麦克风权限不可用，当前主路径为系统语音输入法 / 长按系统语音键输入
 - 公网临时隧道可用但不稳定，不应当写进长期方案
 
 ## 开发约定
@@ -73,4 +73,5 @@ Tesla OpenClaw 项目的后续开发必须遵守以下规则。
 - 涉及消息滚动与输入区布局时，优先保持 composer 真实占位，不要回退到覆盖式浮层模型
 - 涉及 Tesla 系统输入面板兼容时，优先使用标准 viewport 信号；信号缺失时允许使用 focus 驱动的保守底部偏移兜底
 - 当前登录只允许做轻量 shared PIN gate；不要擅自扩成邮箱密码、OAuth 或多用户系统
+- 不要重新引入网页录音、语音上传接口或 ASR 依赖；Tesla 主链路固定为系统语音输入法 + 文本发送
 - 如果只是为了临时 Tesla 外网访问，可使用 `cloudflared` quick tunnel；不要把它写成产品正式依赖

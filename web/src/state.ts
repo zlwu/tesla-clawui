@@ -2,8 +2,7 @@ import type { AppErrorCode, AppStatus, Message } from '@tesla-openclaw/shared';
 
 export type RetryAction =
   | { kind: 'reload-messages' }
-  | { kind: 'send-text'; requestId: string; text: string }
-  | { kind: 'send-voice'; requestId: string; blob: Blob; mimeType: string; language: string };
+  | { kind: 'send-text'; requestId: string; text: string };
 
 export type AppState = {
   authEnabled: boolean;
@@ -20,7 +19,6 @@ export type AppState = {
   error: string | null;
   errorCode: AppErrorCode | null;
   isSendingText: boolean;
-  voiceSupported: boolean;
   networkOnline: boolean;
   retryAction: RetryAction | null;
 };
@@ -40,7 +38,6 @@ export const createInitialState = (): AppState => ({
   error: null,
   errorCode: null,
   isSendingText: false,
-  voiceSupported: false,
   networkOnline: typeof navigator === 'undefined' ? true : navigator.onLine,
   retryAction: null,
 });

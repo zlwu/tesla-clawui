@@ -18,8 +18,6 @@ import type {
   textInputResponseSchema,
   unlockRequestSchema,
   unlockResponseSchema,
-  voiceInputFieldsSchema,
-  voiceInputResponseSchema,
 } from './schemas.js';
 
 export type AppStatus = z.infer<typeof appStatusSchema>;
@@ -36,8 +34,6 @@ export type UnlockRequest = z.infer<typeof unlockRequestSchema>;
 export type UnlockResponse = z.infer<typeof unlockResponseSchema>;
 export type TextInputRequest = z.infer<typeof textInputRequestSchema>;
 export type TextInputResponse = z.infer<typeof textInputResponseSchema>;
-export type VoiceInputFields = z.infer<typeof voiceInputFieldsSchema>;
-export type VoiceInputResponse = z.infer<typeof voiceInputResponseSchema>;
 export type MessagesQuery = z.infer<typeof messagesQuerySchema>;
 export type MessagesResponse = z.infer<typeof messagesResponseSchema>;
 export type HealthResponse = z.infer<typeof healthResponseSchema>;

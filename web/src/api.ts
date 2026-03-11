@@ -6,7 +6,6 @@ import type {
   MessagesResponse,
   TextInputResponse,
   UnlockResponse,
-  VoiceInputResponse,
 } from '@tesla-openclaw/shared';
 import {
   apiErrorResponseSchema,
@@ -16,7 +15,6 @@ import {
   messagesResponseSchema,
   textInputResponseSchema,
   unlockResponseSchema,
-  voiceInputResponseSchema,
 } from '@tesla-openclaw/shared';
 
 import { getWebConfig } from './config.js';
@@ -25,7 +23,6 @@ const createSessionEnvelopeSchema = apiSuccessSchema(createSessionResponseSchema
 const authConfigEnvelopeSchema = apiSuccessSchema(authConfigResponseSchema);
 const textInputEnvelopeSchema = apiSuccessSchema(textInputResponseSchema);
 const unlockEnvelopeSchema = apiSuccessSchema(unlockResponseSchema);
-const voiceInputEnvelopeSchema = apiSuccessSchema(voiceInputResponseSchema);
 const messagesEnvelopeSchema = apiSuccessSchema(messagesResponseSchema);
 const webConfig = getWebConfig();
 
@@ -273,33 +270,4 @@ export const sendTextMessageStream = async (params: {
   } catch {
     return networkError('网络不可用，请稍后重试');
   }
-};
-
-export const sendVoiceMessage = async (params: {
-  sessionId: string;
-  sessionToken: string;
-  authToken?: string | null;
-  requestId: string;
-  blob: Blob;
-  mimeType: string;
-  language: string;
-}): Promise<ApiResponse<VoiceInputResponse>> => {
-  const formData = new FormData();
-  formData.set('sessionId', params.sessionId);
-  formData.set('requestId', params.requestId);
-  formData.set('mimeType', params.mimeType);
-  formData.set('language', params.language);
-  formData.set('audio', params.blob, 'voice-input.webm');
-
-  return safeRequest(
-    async () =>
-      fetch(toApiUrl('/api/voice/input'), {
-        method: 'POST',
-        headers: withAppAuth({
-          Authorization: `Bearer ${params.sessionToken}`,
-        }, params.authToken),
-        body: formData,
-      }),
-    voiceInputEnvelopeSchema,
-  );
 };

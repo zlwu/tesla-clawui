@@ -102,22 +102,6 @@ export const textInputResponseSchema = z.object({
   status: appStatusSchema,
 });
 
-export const voiceInputFieldsSchema = z.object({
-  sessionId: z.string(),
-  requestId: z.string().trim().min(1).max(128),
-  mimeType: z.string().trim().min(1).max(128).optional(),
-  language: z.string().trim().min(1).max(32).default('zh-CN'),
-});
-
-export const voiceInputResponseSchema = z.object({
-  requestId: z.string(),
-  sessionId: z.string(),
-  transcript: z.string(),
-  userMessage: messageSchema,
-  assistantMessage: messageSchema,
-  status: appStatusSchema,
-});
-
 export const messagesQuerySchema = z.object({
   sessionId: z.string(),
   limit: z.coerce.number().int().min(1).max(20).default(8),

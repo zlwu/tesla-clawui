@@ -33,7 +33,6 @@ const configSchema = z.object({
   PORT: z.coerce.number().int().positive().default(3000),
   HOST: z.string().min(1).default('0.0.0.0'),
   DATABASE_URL: z.string().min(1),
-  UPLOAD_DIR: z.string().min(1).default('./server/uploads'),
   SESSION_TOKEN_BYTES: z.coerce.number().int().min(16).max(64).default(24),
   AUTH_ENABLED: envBoolean.default(false),
   AUTH_SHARED_PIN: z.string().regex(/^\d{6}$/).optional(),
@@ -46,17 +45,12 @@ const configSchema = z.object({
   LLM_API_KEY: z.string().optional(),
   LLM_MODEL: z.string().min(1).default('openai/gpt-4o-mini'),
   OPENCLAW_AGENT_ID: z.string().min(1).optional(),
-  ASR_PROVIDER: z.enum(['mock', 'openai-compatible', 'qwen']).default('mock'),
-  ASR_BASE_URL: z.string().optional(),
-  ASR_API_KEY: z.string().optional(),
-  ASR_MODEL: z.string().min(1).default('whisper-1'),
 });
 
 export type AppConfig = {
   port: number;
   host: string;
   databaseUrl: string;
-  uploadDir: string;
   sessionTokenBytes: number;
   authEnabled: boolean;
   authSharedPin?: string;
@@ -69,10 +63,6 @@ export type AppConfig = {
   llmApiKey?: string;
   llmModel: string;
   openclawAgentId?: string;
-  asrProvider: 'mock' | 'openai-compatible' | 'qwen';
-  asrBaseUrl?: string;
-  asrApiKey?: string;
-  asrModel: string;
 };
 
 export const loadConfig = (): AppConfig => {
@@ -81,16 +71,13 @@ export const loadConfig = (): AppConfig => {
     throw new Error('AUTH_SHARED_PIN is required when AUTH_ENABLED=true');
   }
   const databaseUrl = resolve(workspaceRoot, env.DATABASE_URL);
-  const uploadDir = resolve(workspaceRoot, env.UPLOAD_DIR);
 
   mkdirSync(dirname(databaseUrl), { recursive: true });
-  mkdirSync(uploadDir, { recursive: true });
 
   return {
     port: env.PORT,
     host: env.HOST,
     databaseUrl,
-    uploadDir,
     sessionTokenBytes: env.SESSION_TOKEN_BYTES,
     authEnabled: env.AUTH_ENABLED,
     ...(env.AUTH_SHARED_PIN ? { authSharedPin: env.AUTH_SHARED_PIN } : {}),
@@ -103,9 +90,5 @@ export const loadConfig = (): AppConfig => {
     ...(env.LLM_API_KEY ? { llmApiKey: env.LLM_API_KEY } : {}),
     llmModel: env.LLM_MODEL,
     ...(env.OPENCLAW_AGENT_ID ? { openclawAgentId: env.OPENCLAW_AGENT_ID } : {}),
-    asrProvider: env.ASR_PROVIDER,
-    ...(env.ASR_BASE_URL ? { asrBaseUrl: env.ASR_BASE_URL } : {}),
-    ...(env.ASR_API_KEY ? { asrApiKey: env.ASR_API_KEY } : {}),
-    asrModel: env.ASR_MODEL,
   };
 };

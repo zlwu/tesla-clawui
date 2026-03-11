@@ -17,7 +17,6 @@ describe('server api', () => {
     process.env.AUTH_ENABLED = 'false';
     delete process.env.AUTH_SHARED_PIN;
     process.env.LLM_PROVIDER = 'mock';
-    process.env.ASR_PROVIDER = 'mock';
   });
 
   it('handles text input and recent messages', async () => {

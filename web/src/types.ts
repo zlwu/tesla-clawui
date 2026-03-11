@@ -3,5 +3,4 @@ export type {
   CreateSessionResponse,
   Message,
   TextInputResponse,
-  VoiceInputResponse,
 } from '@tesla-openclaw/shared';

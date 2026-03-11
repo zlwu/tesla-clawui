@@ -1,12 +1,11 @@
-import type { AppError, AppErrorCode, AppStatus } from '@tesla-openclaw/shared';
+import type { AppError, AppErrorCode } from '@tesla-openclaw/shared';
 
-import { createSession, fetchAuthConfig, fetchMessages, sendTextMessageStream, sendVoiceMessage, unlockWithPin } from './api.js';
+import { createSession, fetchAuthConfig, fetchMessages, sendTextMessageStream, unlockWithPin } from './api.js';
 import { toDisplayErrorMessage } from './errors.js';
 import { clearPersistedState, persistSessionState, readPersistedState } from './persistence.js';
 import { renderApp } from './render.js';
 import { createInitialState, type AppState, type RetryAction } from './state.js';
-import { buildVisibleMessages, isVoiceBusyStatus, limitMessages, transitionStatus } from './state-machine.js';
-import { VoiceRecorder } from './voice-recorder.js';
+import { buildVisibleMessages, limitMessages } from './state-machine.js';
 import type { Message } from '@tesla-openclaw/shared';
 
 const createRequestId = (prefix: string): string =>
@@ -24,8 +23,6 @@ export class TeslaOpenClawApp {
     messages: limitMessages(this.persistedState.messages),
   };
 
-  private readonly voiceRecorder = new VoiceRecorder();
-  private progressTimerIds: number[] = [];
   private lastRenderSignature: string | null = null;
   private keyboardMode = false;
   private lastButtonAction: { id: string; at: number } | null = null;
@@ -36,7 +33,6 @@ export class TeslaOpenClawApp {
   public constructor(private readonly root: HTMLElement) {}
 
   public async start(): Promise<void> {
-    this.state.voiceSupported = this.voiceRecorder.isSupported();
     this.state.networkOnline = this.readNetworkOnline();
     this.bindEvents();
     this.render();
@@ -81,11 +77,6 @@ export class TeslaOpenClawApp {
 
       if (button.id === 'recover-button') {
         void this.handleRecoveryAction();
-        return;
-      }
-
-      if (button.id === 'voice-button') {
-        void this.handleVoiceAction();
         return;
       }
 
@@ -259,10 +250,6 @@ export class TeslaOpenClawApp {
     }
   }
 
-  private setStatus(next: AppStatus): void {
-    this.state.status = transitionStatus(this.state.status, next);
-  }
-
   private handlePinDigitInput(input: HTMLInputElement): void {
     const digit = input.value.replace(/\D/g, '').slice(-1);
     input.value = digit;
@@ -425,16 +412,10 @@ export class TeslaOpenClawApp {
 
     const hasDraftText = this.state.draftText.trim().length > 0;
     sendButton.classList.toggle('send-icon-button-hidden', !hasDraftText);
-    sendButton.disabled =
-      !hasDraftText
-      || this.state.isSendingText
-      || this.state.status === 'recording'
-      || isVoiceBusyStatus(this.state.status)
-      || !this.state.sessionId;
+    sendButton.disabled = !hasDraftText || this.state.isSendingText || !this.state.sessionId;
   }
 
   private setErrorState(message: string, retryAction: RetryAction | null, errorCode: AppErrorCode): void {
-    this.clearVoiceProgressIndicators();
     this.state.networkOnline = this.readNetworkOnline();
     this.state.status = 'error';
     this.state.error = message;
@@ -593,10 +574,6 @@ export class TeslaOpenClawApp {
       return;
     }
 
-    if (isVoiceBusyStatus(this.state.status) || this.state.status === 'recording') {
-      return;
-    }
-
     const text = this.state.draftText.trim();
     if (!text) {
       this.setErrorState('请输入内容', null, 'VALIDATION_FAILED');
@@ -665,116 +642,8 @@ export class TeslaOpenClawApp {
     this.render();
   }
 
-  private async handleVoiceAction(): Promise<void> {
-    if (!this.state.voiceSupported) {
-      this.setErrorState('当前浏览器不支持录音', null, 'MIC_REQUIRED');
-      this.render();
-      return;
-    }
-
-    if (this.state.isSendingText) {
-      return;
-    }
-
-    if (this.state.status === 'recording') {
-      await this.stopRecordingAndSend();
-      return;
-    }
-
-    await this.startRecording();
-  }
-
-  private async startRecording(): Promise<void> {
-    try {
-      await this.voiceRecorder.start();
-      this.state.error = null;
-      this.state.errorCode = null;
-      this.state.retryAction = null;
-      this.setStatus('recording');
-      this.render();
-    } catch (error) {
-      const message = error instanceof Error ? error.message : '无法开始录音，请检查麦克风权限';
-      this.setErrorState(message, null, 'MIC_REQUIRED');
-      this.render();
-    }
-  }
-
-  private async stopRecordingAndSend(): Promise<void> {
-    if (!this.state.sessionId || !this.state.sessionToken) {
-      return;
-    }
-
-    try {
-      const recording = await this.voiceRecorder.stop();
-      await this.submitVoiceMessage({
-        requestId: createRequestId('req_voice'),
-        blob: recording.blob,
-        mimeType: recording.mimeType,
-        language: 'zh-CN',
-      });
-    } catch {
-      this.setErrorState('录音上传失败，请重试', null, 'AUDIO_UPLOAD_FAILED');
-      this.render();
-    }
-  }
-
-  private async submitVoiceMessage(params: {
-    requestId: string;
-    blob: Blob;
-    mimeType: string;
-    language: string;
-  }): Promise<void> {
-    if (!this.state.sessionId || !this.state.sessionToken) {
-      return;
-    }
-
-    this.state.error = null;
-    this.state.errorCode = null;
-    this.state.retryAction = null;
-    this.state.status = 'uploading';
-    this.render();
-    this.startVoiceProgressIndicators();
-
-    const result = await sendVoiceMessage({
-      sessionId: this.state.sessionId,
-      sessionToken: this.state.sessionToken,
-      authToken: this.state.authToken,
-      requestId: params.requestId,
-      blob: params.blob,
-      mimeType: params.mimeType,
-      language: params.language,
-    });
-
-    this.clearVoiceProgressIndicators();
-    if (!result.ok) {
-      this.applyApiFailure(result, {
-        kind: 'send-voice',
-        requestId: params.requestId,
-        blob: params.blob,
-        mimeType: params.mimeType,
-        language: params.language,
-      });
-      this.render();
-      return;
-    }
-
-    this.state.messages = limitMessages([
-      ...this.state.messages,
-      result.data.userMessage,
-      result.data.assistantMessage,
-    ]);
-    this.shouldAutoScrollMessages = true;
-    this.state.status = 'idle';
-    this.state.error = null;
-    this.state.errorCode = null;
-    this.state.retryAction = null;
-    this.persistState();
-    this.render();
-  }
-
   private async handleRecoveryAction(): Promise<void> {
     const retryAction = this.state.retryAction;
-    this.clearVoiceProgressIndicators();
     this.state.error = null;
     this.state.errorCode = null;
     this.state.retryAction = null;
@@ -797,10 +666,7 @@ export class TeslaOpenClawApp {
       this.state.draftText = retryAction.text;
       this.render();
       await this.retryTextMessage(retryAction);
-      return;
     }
-
-    await this.submitVoiceMessage(retryAction);
   }
 
   private async retryTextMessage(action: Extract<RetryAction, { kind: 'send-text' }>): Promise<void> {
@@ -920,32 +786,5 @@ export class TeslaOpenClawApp {
 
     this.state.messages = limitMessages(messages);
     this.shouldAutoScrollMessages = true;
-  }
-
-  private startVoiceProgressIndicators(): void {
-    this.clearVoiceProgressIndicators();
-    this.progressTimerIds.push(
-      window.setTimeout(() => {
-        if (this.state.status === 'uploading') {
-          this.setStatus('transcribing');
-          this.render();
-        }
-      }, 700),
-    );
-    this.progressTimerIds.push(
-      window.setTimeout(() => {
-        if (this.state.status === 'uploading' || this.state.status === 'transcribing') {
-          this.state.status = 'thinking';
-          this.render();
-        }
-      }, 1800),
-    );
-  }
-
-  private clearVoiceProgressIndicators(): void {
-    for (const timerId of this.progressTimerIds) {
-      window.clearTimeout(timerId);
-    }
-    this.progressTimerIds = [];
   }
 }

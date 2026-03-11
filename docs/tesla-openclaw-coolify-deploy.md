@@ -33,15 +33,13 @@
 
 ## 持久化挂载
 
-至少挂这两个目录：
+至少挂这个目录：
 
 - `/app/server/data`
-- `/app/server/uploads`
 
 推荐对应环境变量：
 
 - `DATABASE_URL=./server/data/openclaw.db`
-- `UPLOAD_DIR=./server/uploads`
 
 ## 生产环境变量
 
@@ -58,10 +56,6 @@
 - `LLM_API_KEY=<Gateway token>`
 - `LLM_MODEL=openclaw`
 - `OPENCLAW_AGENT_ID=main`
-- `ASR_PROVIDER=qwen`
-- `ASR_BASE_URL=https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation`
-- `ASR_API_KEY=<DashScope key>`
-- `ASR_MODEL=qwen3-asr-flash`
 
 建议同时保留：
 
@@ -88,11 +82,11 @@
 
 1. Coolify Health Check 显示正常
 2. `/api/health` 返回 200
-3. `server/data` 和 `server/uploads` 已挂卷
+3. `server/data` 已挂卷
 4. `AUTH_SHARED_PIN` 已换成正式值，不再使用本地测试 PIN
 5. `AUTH_TOKEN_SECRET` 已设置为强随机值
 6. `LLM_BASE_URL` 已指向生产 OpenClaw Gateway
-7. `ASR_API_KEY` 与 `LLM_API_KEY` 已使用生产密钥
+7. `LLM_API_KEY` 已使用生产密钥
 
 ## 上线后最小回归
 
@@ -100,7 +94,7 @@
 2. 输入 PIN 后能进入聊天界面
 3. 刷新页面后仍能恢复当前会话
 4. 发送一条文本后能收到 OpenClaw 回复
-5. 语音上传后能返回 transcript 和回复
+5. 发送一条文本后能返回 OpenClaw 回复
 6. 重启容器后历史消息仍在
 
 ## 当前不建议

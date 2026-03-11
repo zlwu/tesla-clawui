@@ -4,12 +4,12 @@ export const MAX_VISIBLE_MESSAGES = 8;
 const MAX_VISIBLE_MESSAGE_LENGTH = 1200;
 
 const allowedTransitions: Record<AppStatus, AppStatus[]> = {
-  idle: ['recording', 'thinking', 'error'],
-  recording: ['uploading', 'idle', 'error'],
-  uploading: ['transcribing', 'thinking', 'idle', 'error'],
-  transcribing: ['thinking', 'idle', 'error'],
+  idle: ['thinking', 'error'],
+  recording: ['idle', 'error'],
+  uploading: ['idle', 'error'],
+  transcribing: ['idle', 'error'],
   thinking: ['idle', 'error'],
-  error: ['idle', 'recording', 'thinking', 'uploading', 'transcribing'],
+  error: ['idle', 'thinking'],
 };
 
 export const statusLabelMap: Record<AppStatus, string> = {
@@ -39,6 +39,3 @@ export const buildVisibleMessages = (messages: Message[]): Message[] =>
         ? `${message.content.slice(0, MAX_VISIBLE_MESSAGE_LENGTH).trimEnd()}…`
         : message.content,
   }));
-
-export const isVoiceBusyStatus = (status: AppStatus): boolean =>
-  status === 'uploading' || status === 'transcribing' || status === 'thinking';

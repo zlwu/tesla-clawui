@@ -5,13 +5,13 @@ import { MAX_VISIBLE_MESSAGES, buildVisibleMessages, limitMessages, transitionSt
 
 describe('state machine', () => {
   it('allows valid status transitions', () => {
-    expect(transitionStatus('idle', 'recording')).toBe('recording');
-    expect(transitionStatus('recording', 'uploading')).toBe('uploading');
-    expect(transitionStatus('uploading', 'transcribing')).toBe('transcribing');
+    expect(transitionStatus('idle', 'thinking')).toBe('thinking');
+    expect(transitionStatus('thinking', 'idle')).toBe('idle');
+    expect(transitionStatus('error', 'thinking')).toBe('thinking');
   });
 
   it('blocks invalid status transitions', () => {
-    expect(transitionStatus('idle', 'transcribing')).toBe('idle');
+    expect(transitionStatus('idle', 'recording')).toBe('idle');
   });
 
   it('clips very long message content for rendering', () => {

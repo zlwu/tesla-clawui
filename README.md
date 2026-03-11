@@ -6,14 +6,14 @@
 
 - Phase 0：单仓初始化、规范、配置、SQLite + Drizzle
 - Phase 1：共享契约、文本聊天接口、最小大字聊天 UI
-- Phase 2：语音录音、语音上传、mock ASR -> LLM、基础状态展示
+- Phase 2：文本主链路完善、系统语音输入提示、基础状态展示
 - Phase 3：显式状态机、最近消息恢复、消息裁剪、前端稳定性收口
 - Phase 4：统一错误模型、请求链路日志、requestId 幂等、弱网恢复、交付文档
 
 ## 当前状态
 
-- 本地浏览器验证已通过：页面加载、文本发送、语音录音、刷新恢复、弱网手动重试
-- 真实 provider 联调已通过：`Qwen ASR + OpenClaw Gateway LLM`
+- 本地浏览器验证已通过：页面加载、文本发送、刷新恢复、弱网手动重试
+- 真实 provider 联调已通过：`OpenClaw Gateway LLM`
 - 本地 OpenClaw Gateway HTTP chat endpoint 已完成真实 `/api/text/input` 联调
 - 文本主链路已支持 SSE streaming，assistant 回复可边输出边显示
 - assistant 消息已支持受控 Markdown 子集渲染：标题、列表、引用、粗体、行内代码、代码块
@@ -26,7 +26,7 @@
 - 当前状态汇总见 `docs/tesla-openclaw-current-status.md`
 - 当前真机 UI 重写设计见 `docs/tesla-openclaw-client-ui-design.md`
 - Tesla 真机主输入路径已调整为：系统语音输入法 / 长按系统语音键输入 -> 文本框 -> 发送
-- 当前输入区已收口为：单一 composer、右侧发送按钮、次级麦克风工具位
+- 当前输入区已收口为：单一 composer、右侧发送按钮、系统语音输入提示
 - 当前消息滚动策略已收口为：初始定位到底部、streaming 默认跟随、用户手动上滑后停止强制跟随
 - 当前 Tesla 键盘避让策略已补充：优先使用 `interactive-widget` / `visualViewport`，失效时退回 focus 驱动的保守上移
 
@@ -74,7 +74,7 @@
 
 1. 打开页面后可自动创建 session
 2. 文本发送成功，消息能回显
-3. 语音录音成功，返回 transcript 和回复
+3. 文本发送后返回 OpenClaw 回复
 4. 刷新页面后最近消息仍可见
 5. 断网后出现可解释错误，恢复网络后可点“重试上一步”
 6. 相同 `requestId` 不会重复生成多份回复
@@ -94,14 +94,14 @@ npm run smoke:openclaw
 
 ## 已知边界
 
-- 真实 `ASR + LLM` 本地已验证通过，Tesla 真机主链路也已验证通过
+- 真实 `LLM` 本地已验证通过，Tesla 真机文本主链路也已验证通过
 - 当前 LLM 主链路已切换为本地 OpenClaw Gateway；如需回退，可改回 `openai-compatible`
 - TTS、手机端协同、WebSocket 都不在 MVP
 - 当前已落地的流式能力限定为文本 SSE streaming，不扩展为 WebSocket 对话架构
 - Markdown 渲染当前仅限 assistant 消息的受控子集，不支持 HTML 直通、表格、图片和复杂嵌套语法
 - 当前登录能力仅为 shared PIN 门禁，不是多用户账号体系；适合单环境 / 小范围固定用户使用
 - Tesla 真机当前结论为 `Proceed with Caveats`，仍可继续按 `docs/tesla-openclaw-mvp-validation-plan.md` 补充后续回归与优化验证
-- Tesla 真机网页麦克风权限不可用，因此首版真机主路径改为系统语音输入法 / 长按系统语音键输入
+- Tesla 真机网页麦克风权限不可用，因此网页录音与 ASR 已从主线删除，首版真机主路径固定为系统语音输入法 / 长按系统语音键输入
 - `cloudflared`/临时公网隧道只用于测试，不属于正式产品方案
 
 ## OpenClaw 接入

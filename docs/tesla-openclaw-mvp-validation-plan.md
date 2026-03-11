@@ -6,7 +6,7 @@
 
 当前 MVP 已收敛为：
 
-> 在 Tesla 车机浏览器中实现“语音输入 + 多轮文本显示”的对话体验。
+> 在 Tesla 车机浏览器中实现“系统语音输入法 + 多轮文本显示”的对话体验。
 
 本阶段 **不将 TTS 播放作为主验证目标**，也 **不引入手机端协同**，除非车机浏览器存在无法绕过的技术门槛。
 
@@ -17,8 +17,8 @@
 项目当前基于以下假设推进：
 
 1. Tesla 浏览器可以打开一个足够轻量的 Web 页面
-2. Tesla 浏览器有机会支持麦克风输入或等效录音能力
-3. 浏览器可以稳定完成录音 -> 上传 -> 文本返回
+2. Tesla 浏览器可稳定唤起系统语音输入法作为文本输入主入口
+3. 浏览器可以稳定完成文本发送 -> 文本返回
 4. 老款 Atom 车机仍可承载一个极简多轮文本界面
 5. 若 TTS 暂不启用，系统可显著降低实现风险
 
@@ -28,8 +28,8 @@
 
 截至 2026-03-10，以下验证已完成：
 
-- Chromium 下页面加载、session 创建、文本发送、语音录音、刷新恢复、弱网手动重试通过
-- 真实 provider 联调通过：`Qwen ASR + OpenClaw Gateway LLM`
+- Chromium 下页面加载、session 创建、文本发送、刷新恢复、弱网手动重试通过
+- 真实 provider 联调通过：`OpenClaw Gateway LLM`
 - 本地 OpenClaw Gateway HTTP chat endpoint 已完成真实 `/api/text/input` 联调
 - 开发态与生产态均已验证为 Fastify 单服务托管页面与 API
 - `npm run lint`、`npm run typecheck`、`npm test`、`npm run build` 已通过

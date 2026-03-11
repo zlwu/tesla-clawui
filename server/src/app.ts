@@ -1,6 +1,5 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
-import multipart from '@fastify/multipart';
 import fastifyStatic from '@fastify/static';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -14,16 +13,12 @@ import { healthRoutes } from './routes/health.js';
 import { messagesRoutes } from './routes/messages.js';
 import { sessionRoutes } from './routes/session.js';
 import { textRoutes } from './routes/text.js';
-import { voiceRoutes } from './routes/voice.js';
 import { AuthService } from './services/auth-service.js';
-import { AsrService } from './services/asr-service.js';
-import { AudioFileService } from './services/audio-file-service.js';
 import { LlmService } from './services/llm-service.js';
 import { MessageService } from './services/message-service.js';
 import { RequestLogService } from './services/request-log-service.js';
 import { SessionService } from './services/session-service.js';
 import { TextService } from './services/text-service.js';
-import { VoiceService } from './services/voice-service.js';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -32,7 +27,6 @@ declare module 'fastify' {
       sessionService: SessionService;
       messageService: MessageService;
       textService: TextService;
-      voiceService: VoiceService;
     };
   }
 }
@@ -52,21 +46,11 @@ export const createApp = () => {
   const sessionService = new SessionService(db, config);
   const messageService = new MessageService(db);
   const requestLogService = new RequestLogService(db);
-  const audioFileService = new AudioFileService(db, config);
-  const asrService = new AsrService(config);
   const llmService = new LlmService(config);
   const textService = new TextService(
     sessionService,
     messageService,
     requestLogService,
-    llmService,
-  );
-  const voiceService = new VoiceService(
-    sessionService,
-    messageService,
-    requestLogService,
-    audioFileService,
-    asrService,
     llmService,
   );
 
@@ -76,7 +60,6 @@ export const createApp = () => {
     sessionService,
     messageService,
     textService,
-    voiceService,
   });
 
   app.addHook('onRequest', async (request, reply) => {
@@ -143,12 +126,6 @@ export const createApp = () => {
   });
 
   void app.register(cors, { origin: true });
-  void app.register(multipart, {
-    limits: {
-      files: 1,
-      fileSize: 10 * 1024 * 1024,
-    },
-  });
   void app.register(fastifyStatic, {
     root: webDistDir,
     prefix: '/',
@@ -157,7 +134,6 @@ export const createApp = () => {
   void app.register(healthRoutes);
   void app.register(sessionRoutes);
   void app.register(textRoutes);
-  void app.register(voiceRoutes);
   void app.register(messagesRoutes);
   app.setNotFoundHandler(async (request, reply) => {
     if (

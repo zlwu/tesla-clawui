@@ -1,6 +1,9 @@
+import 'dotenv/config';
+
 const baseUrl = process.env.SMOKE_BASE_URL ?? 'http://127.0.0.1:3000';
 const prompt =
   process.env.SMOKE_TEXT ?? '请用一句话说明你现在已经通过本地 OpenClaw Gateway 在回复。';
+const smokePin = process.env.SMOKE_PIN ?? process.env.AUTH_SHARED_PIN ?? '';
 const requestId = `req_openclaw_smoke_${Date.now()}`;
 
 const fail = (message, details) => {
@@ -19,10 +22,52 @@ const fail = (message, details) => {
 };
 
 const run = async () => {
+  let authToken = '';
+  const authConfigResponse = await fetch(`${baseUrl}/api/auth/config`);
+  const authConfigPayload = await authConfigResponse.json().catch(() => null);
+
+  if (!authConfigResponse.ok) {
+    fail('auth config failed', {
+      status: authConfigResponse.status,
+      payload: authConfigPayload,
+    });
+  }
+
+  const authEnabled = Boolean(authConfigPayload?.data?.enabled);
+  if (authEnabled) {
+    if (!/^\d{6}$/.test(smokePin)) {
+      fail('shared pin is required for smoke', {
+        hint: 'Set SMOKE_PIN or AUTH_SHARED_PIN to a 6-digit PIN before running smoke:openclaw.',
+      });
+    }
+
+    const unlockResponse = await fetch(`${baseUrl}/api/auth/unlock`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ pin: smokePin }),
+    });
+    const unlockPayload = await unlockResponse.json().catch(() => null);
+
+    if (!unlockResponse.ok) {
+      fail('auth unlock failed', {
+        status: unlockResponse.status,
+        payload: unlockPayload,
+      });
+    }
+
+    authToken = unlockPayload?.data?.authToken ?? '';
+    if (!authToken) {
+      fail('auth unlock returned incomplete payload', { payload: unlockPayload });
+    }
+  }
+
   const createResponse = await fetch(`${baseUrl}/api/session/create`, {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
+      ...(authToken ? { 'x-app-auth': authToken } : {}),
     },
     body: JSON.stringify({
       device: {
@@ -54,6 +99,7 @@ const run = async () => {
     headers: {
       'content-type': 'application/json',
       authorization: `Bearer ${sessionToken}`,
+      ...(authToken ? { 'x-app-auth': authToken } : {}),
     },
     body: JSON.stringify({
       sessionId,

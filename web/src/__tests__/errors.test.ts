@@ -19,13 +19,13 @@ describe('error messages', () => {
   it('maps known error codes to stable copy', () => {
     const message = toDisplayErrorMessage(
       {
-        code: 'ASR_FAILED',
-        message: '识别失败',
+        code: 'LLM_FAILED',
+        message: '回复失败',
         retryable: true,
       },
       true,
     );
 
-    expect(message).toBe('语音识别失败，请重试。');
+    expect(message).toBe('回复生成失败，请重试。');
   });
 });

@@ -45,15 +45,13 @@ describe('renderApp', () => {
     expect(root.querySelector('.md-blockquote')?.textContent).toContain('引用');
   });
 
-  it('renders the voice button', () => {
+  it('renders the text composer without a voice button', () => {
     const root = document.createElement('div');
     const state = createInitialState();
-    state.voiceSupported = true;
 
     renderApp(root, state);
 
-    expect(root.querySelector('#voice-button')).not.toBeNull();
-    expect(root.querySelector('.composer-tools #voice-button')).not.toBeNull();
+    expect(root.querySelector('#voice-button')).toBeNull();
     expect(root.querySelector<HTMLTextAreaElement>('#text-input')?.placeholder).toContain('系统语音输入');
   });
 
@@ -88,14 +86,13 @@ describe('renderApp', () => {
     expect(root.querySelector<HTMLTextAreaElement>('#text-input')?.value).toBe('保留中的文本');
   });
 
-  it('shows keyboard dictation hint when voice recording is unavailable', () => {
+  it('shows Tesla system dictation hint in the composer placeholder', () => {
     const root = document.createElement('div');
     const state = createInitialState();
-    state.voiceSupported = false;
 
     renderApp(root, state);
 
-    expect(root.querySelector<HTMLTextAreaElement>('#text-input')?.placeholder).toContain('Tesla 真机可使用系统语音输入');
+    expect(root.querySelector<HTMLTextAreaElement>('#text-input')?.placeholder).toContain('系统语音输入');
   });
 
   it('places the send button next to the text input when draft exists', () => {
