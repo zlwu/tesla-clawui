@@ -1,19 +1,25 @@
-import type { AppError, AppErrorCode } from '@tesla-openclaw/shared';
+import type { AppError, AppErrorCode, Message } from '@tesla-openclaw/shared';
 
-import { createSession, fetchAuthConfig, fetchMessages, sendTextMessageStream, unlockWithPin } from './api.js';
+import {
+  createSession,
+  fetchAuthConfig,
+  fetchMessages,
+  sendTextMessageStream,
+  unlockWithPin,
+} from './api.js';
 import { toDisplayErrorMessage } from './errors.js';
 import { clearPersistedState, persistSessionState, readPersistedState } from './persistence.js';
 import { renderApp } from './render.js';
 import { createInitialState, type AppState, type RetryAction } from './state.js';
 import { buildVisibleMessages, limitMessages } from './state-machine.js';
-import type { Message } from '@tesla-openclaw/shared';
+import { resolveKeyboardLayout } from './ui-state.js';
 
 const createRequestId = (prefix: string): string =>
   `${prefix}_${Date.now()}_${Math.random().toString(16).slice(2, 10)}`;
 
 export class TeslaOpenClawApp {
   private readonly persistedState = readPersistedState();
-  private readonly keyboardFallbackDelayMs = 180;
+  private readonly keyboardSettleDelayMs = 180;
   private readonly state: AppState = {
     ...createInitialState(),
     authToken: this.persistedState.authToken,
@@ -26,16 +32,17 @@ export class TeslaOpenClawApp {
   private lastRenderSignature: string | null = null;
   private keyboardMode = false;
   private lastButtonAction: { id: string; at: number } | null = null;
-  private shouldAutoScrollMessages = true;
   private pendingInitialScroll = true;
-  private keyboardFallbackTimerId: number | null = null;
+  private keyboardSettleTimerId: number | null = null;
+  private waitingIndicatorTimerId: number | null = null;
+  private baselineLayoutViewportHeight: number | null = null;
 
   public constructor(private readonly root: HTMLElement) {}
 
   public async start(): Promise<void> {
     this.state.networkOnline = this.readNetworkOnline();
     this.bindEvents();
-    this.syncViewportHeight();
+    this.syncViewportLayout();
     this.render();
     await this.bootstrapApp();
   }
@@ -48,11 +55,7 @@ export class TeslaOpenClawApp {
       }
 
       const button = target.closest('button');
-      if (!(button instanceof HTMLButtonElement)) {
-        return;
-      }
-
-       if (button.disabled) {
+      if (!(button instanceof HTMLButtonElement) || button.disabled) {
         return;
       }
 
@@ -78,6 +81,11 @@ export class TeslaOpenClawApp {
 
       if (button.id === 'recover-button') {
         void this.handleRecoveryAction();
+        return;
+      }
+
+      if (button.id === 'back-to-bottom-button') {
+        this.handleBackToBottom();
         return;
       }
 
@@ -116,6 +124,21 @@ export class TeslaOpenClawApp {
 
     this.root.addEventListener('keydown', (event) => {
       const target = event.target;
+      if (target instanceof HTMLTextAreaElement && target.id === 'text-input') {
+        if (
+          event.key === 'Enter'
+          && !event.shiftKey
+          && !event.altKey
+          && !event.ctrlKey
+          && !event.metaKey
+          && !event.isComposing
+        ) {
+          event.preventDefault();
+          void this.handleSend();
+        }
+        return;
+      }
+
       if (!(target instanceof HTMLInputElement) || !target.classList.contains('auth-pin-digit')) {
         return;
       }
@@ -162,7 +185,13 @@ export class TeslaOpenClawApp {
           return;
         }
 
-        this.shouldAutoScrollMessages = this.isNearMessagesBottom(target);
+        const nextFollowMode = this.isNearMessagesBottom(target) ? 'follow' : 'history';
+        if (this.state.messageFollowMode === nextFollowMode) {
+          return;
+        }
+
+        this.state.messageFollowMode = nextFollowMode;
+        this.render();
       },
       true,
     );
@@ -184,8 +213,9 @@ export class TeslaOpenClawApp {
       }
 
       this.keyboardMode = true;
-      this.syncKeyboardViewport();
-      this.scheduleKeyboardFallbackCheck();
+      this.state.restoreFollowOnBlur = this.state.messageFollowMode === 'follow';
+      this.syncViewportLayout();
+      this.scheduleKeyboardSettle();
       window.setTimeout(() => {
         this.scrollComposerIntoView();
       }, 120);
@@ -197,26 +227,46 @@ export class TeslaOpenClawApp {
         return;
       }
 
+      const shouldRestoreFollow = this.state.restoreFollowOnBlur;
       this.keyboardMode = false;
-      this.clearKeyboardFallbackCheck();
-      this.syncKeyboardViewport();
+      this.state.restoreFollowOnBlur = false;
+      this.clearKeyboardSettle();
+      this.syncViewportLayout();
+
       window.setTimeout(() => {
-        this.scrollMessagesToBottom({ force: true });
+        if (shouldRestoreFollow) {
+          this.handleBackToBottom();
+          return;
+        }
+
+        this.syncViewportLayout();
       }, 80);
     });
 
     window.addEventListener('resize', () => {
-      this.syncViewportHeight();
-      if (!this.keyboardMode) {
-        return;
+      this.syncViewportLayout();
+      if (this.keyboardMode) {
+        this.scheduleKeyboardSettle();
       }
+    });
 
-      this.syncKeyboardViewport();
-      this.scheduleKeyboardFallbackCheck();
+    const visualViewport = window.visualViewport;
+    visualViewport?.addEventListener('resize', () => {
+      this.syncViewportLayout();
+      if (this.keyboardMode) {
+        this.scheduleKeyboardSettle();
+      }
+    });
+    visualViewport?.addEventListener('scroll', () => {
+      this.syncViewportLayout();
+      if (this.keyboardMode) {
+        this.scheduleKeyboardSettle();
+      }
     });
   }
 
   private render(): void {
+    this.syncComposerStatusKind();
     const viewState = {
       ...this.state,
       messages: buildVisibleMessages(this.state.messages),
@@ -229,10 +279,9 @@ export class TeslaOpenClawApp {
     this.lastRenderSignature = nextSignature;
     renderApp(this.root, viewState);
 
-    this.syncViewportHeight();
+    this.syncViewportLayout();
     this.syncComposerInputHeight();
-    this.syncKeyboardViewport();
-    if (this.pendingInitialScroll || this.shouldAutoScrollMessages) {
+    if (this.pendingInitialScroll || this.state.messageFollowMode === 'follow') {
       this.scrollMessagesToBottom({ force: this.pendingInitialScroll });
       this.pendingInitialScroll = false;
     }
@@ -297,16 +346,27 @@ export class TeslaOpenClawApp {
     return typeof navigator === 'undefined' ? true : navigator.onLine;
   }
 
-  private syncViewportHeight(): void {
-    const viewportHeight = Math.max(window.innerHeight, 320);
-    this.root.style.setProperty('--app-viewport-height', `${Math.max(viewportHeight, 320)}px`);
-  }
+  private syncViewportLayout(): void {
+    const layoutViewportHeight = Math.max(window.innerHeight, 320);
+    if (!this.keyboardMode) {
+      this.baselineLayoutViewportHeight = layoutViewportHeight;
+    }
 
-  private syncKeyboardViewport(): void {
-    const keyboardInset = this.keyboardMode ? this.getKeyboardFallbackOffset() : 0;
+    const visualViewport = window.visualViewport;
+    const metrics = resolveKeyboardLayout({
+      keyboardMode: this.keyboardMode,
+      layoutViewportHeight,
+      baselineLayoutViewportHeight: this.baselineLayoutViewportHeight,
+      visualViewportHeight: visualViewport?.height ?? null,
+      visualViewportOffsetTop: visualViewport?.offsetTop ?? null,
+      allowFallbackInset: this.shouldUseTouchKeyboardFallback(),
+    });
 
-    this.root.style.setProperty('--keyboard-inset', `${keyboardInset}px`);
-    this.root.classList.toggle('keyboard-active', this.keyboardMode || keyboardInset > 0);
+    this.state.keyboardAvoidanceSource = metrics.source;
+    this.root.style.setProperty('--app-viewport-height', `${metrics.viewportHeight}px`);
+    this.root.style.setProperty('--keyboard-inset', `${metrics.keyboardInset}px`);
+    this.root.classList.toggle('keyboard-active', this.keyboardMode || metrics.keyboardInset > 0);
+    this.root.dataset.keyboardSource = metrics.source;
   }
 
   private scrollMessagesToBottom(options?: { force?: boolean }): void {
@@ -315,7 +375,7 @@ export class TeslaOpenClawApp {
       return;
     }
 
-    if (!options?.force && !this.shouldAutoScrollMessages) {
+    if (!options?.force && this.state.messageFollowMode !== 'follow') {
       return;
     }
 
@@ -339,30 +399,28 @@ export class TeslaOpenClawApp {
     composer?.scrollIntoView({ block: 'end' });
   }
 
-  private scheduleKeyboardFallbackCheck(): void {
-    this.clearKeyboardFallbackCheck();
-    this.keyboardFallbackTimerId = window.setTimeout(() => {
-      this.keyboardFallbackTimerId = null;
-      this.syncKeyboardViewport();
-      this.scrollComposerIntoView();
-    }, this.keyboardFallbackDelayMs);
+  private handleBackToBottom(): void {
+    this.state.messageFollowMode = 'follow';
+    this.render();
+    this.scrollMessagesToBottom({ force: true });
   }
 
-  private clearKeyboardFallbackCheck(): void {
-    if (this.keyboardFallbackTimerId === null) {
+  private scheduleKeyboardSettle(): void {
+    this.clearKeyboardSettle();
+    this.keyboardSettleTimerId = window.setTimeout(() => {
+      this.keyboardSettleTimerId = null;
+      this.syncViewportLayout();
+      this.scrollComposerIntoView();
+    }, this.keyboardSettleDelayMs);
+  }
+
+  private clearKeyboardSettle(): void {
+    if (this.keyboardSettleTimerId === null) {
       return;
     }
 
-    window.clearTimeout(this.keyboardFallbackTimerId);
-    this.keyboardFallbackTimerId = null;
-  }
-
-  private getKeyboardFallbackOffset(): number {
-    if (!this.keyboardMode || !this.shouldUseTouchKeyboardFallback()) {
-      return 0;
-    }
-
-    return Math.min(Math.max(Math.round(window.innerHeight * 0.22), 120), 180);
+    window.clearTimeout(this.keyboardSettleTimerId);
+    this.keyboardSettleTimerId = null;
   }
 
   private shouldUseTouchKeyboardFallback(): boolean {
@@ -395,7 +453,64 @@ export class TeslaOpenClawApp {
 
     const hasDraftText = this.state.draftText.trim().length > 0;
     sendButton.classList.toggle('send-icon-button-hidden', !hasDraftText);
-    sendButton.disabled = !hasDraftText || this.state.isSendingText || !this.state.sessionId;
+    sendButton.disabled =
+      !hasDraftText || this.state.responsePhase !== 'idle' || !this.state.sessionId;
+  }
+
+  private syncComposerStatusKind(): void {
+    if (this.state.status === 'error' && this.state.error) {
+      this.state.composerStatusKind = 'error';
+      return;
+    }
+
+    if (!this.state.networkOnline) {
+      this.state.composerStatusKind = 'offline';
+      return;
+    }
+
+    if (!this.state.sessionId) {
+      this.state.composerStatusKind = 'booting';
+      return;
+    }
+
+    if (this.state.responsePhase === 'waiting') {
+      this.state.composerStatusKind = 'waiting';
+      return;
+    }
+
+    if (this.state.responsePhase === 'streaming') {
+      this.state.composerStatusKind = 'streaming';
+      return;
+    }
+
+    if (this.state.messageFollowMode === 'history') {
+      this.state.composerStatusKind = 'history';
+      return;
+    }
+
+    this.state.composerStatusKind = 'idle';
+  }
+
+  private startWaitingIndicator(): void {
+    this.stopWaitingIndicator();
+    this.waitingIndicatorTimerId = window.setInterval(() => {
+      if (this.state.responsePhase !== 'waiting') {
+        this.stopWaitingIndicator();
+        return;
+      }
+
+      this.state.waitingIndicatorFrame = (this.state.waitingIndicatorFrame + 1) % 3;
+      this.render();
+    }, 520);
+  }
+
+  private stopWaitingIndicator(): void {
+    if (this.waitingIndicatorTimerId !== null) {
+      window.clearInterval(this.waitingIndicatorTimerId);
+      this.waitingIndicatorTimerId = null;
+    }
+
+    this.state.waitingIndicatorFrame = 0;
   }
 
   private setErrorState(message: string, retryAction: RetryAction | null, errorCode: AppErrorCode): void {
@@ -404,6 +519,9 @@ export class TeslaOpenClawApp {
     this.state.error = message;
     this.state.errorCode = errorCode;
     this.state.retryAction = retryAction;
+    this.state.responsePhase = 'idle';
+    this.state.pendingAssistantMessageId = null;
+    this.stopWaitingIndicator();
   }
 
   private applyApiFailure(
@@ -459,8 +577,14 @@ export class TeslaOpenClawApp {
     this.state.error = null;
     this.state.errorCode = null;
     this.state.retryAction = null;
+    this.state.messageFollowMode = 'follow';
+    this.state.responsePhase = 'idle';
+    this.state.composerStatusKind = 'booting';
+    this.state.keyboardAvoidanceSource = 'none';
+    this.state.restoreFollowOnBlur = true;
+    this.state.pendingAssistantMessageId = null;
+    this.stopWaitingIndicator();
     this.pendingInitialScroll = true;
-    this.shouldAutoScrollMessages = true;
     clearPersistedState();
   }
 
@@ -492,6 +616,9 @@ export class TeslaOpenClawApp {
     this.state.pinDraft = '';
     this.state.error = null;
     this.state.errorCode = null;
+    this.state.responsePhase = 'idle';
+    this.state.pendingAssistantMessageId = null;
+    this.stopWaitingIndicator();
     this.persistState();
     this.render();
 
@@ -525,6 +652,9 @@ export class TeslaOpenClawApp {
     this.state.error = null;
     this.state.errorCode = null;
     this.state.retryAction = null;
+    this.state.responsePhase = 'idle';
+    this.state.pendingAssistantMessageId = null;
+    this.stopWaitingIndicator();
     this.persistState();
     this.render();
   }
@@ -546,8 +676,11 @@ export class TeslaOpenClawApp {
     this.state.error = null;
     this.state.errorCode = null;
     this.state.retryAction = null;
+    this.state.responsePhase = 'idle';
+    this.state.pendingAssistantMessageId = null;
+    this.stopWaitingIndicator();
     this.pendingInitialScroll = true;
-    this.shouldAutoScrollMessages = true;
+    this.state.messageFollowMode = 'follow';
     this.persistState();
     this.render();
   }
@@ -582,13 +715,16 @@ export class TeslaOpenClawApp {
       optimisticUserMessage,
       optimisticAssistantMessage,
     ]);
-    this.shouldAutoScrollMessages = true;
+    this.state.messageFollowMode = 'follow';
     this.state.draftText = '';
     this.state.isSendingText = true;
     this.state.status = 'thinking';
     this.state.error = null;
     this.state.errorCode = null;
     this.state.retryAction = null;
+    this.state.responsePhase = 'waiting';
+    this.state.pendingAssistantMessageId = optimisticAssistantMessage.messageId;
+    this.startWaitingIndicator();
     this.render();
 
     const result = await sendTextMessageStream({
@@ -598,29 +734,39 @@ export class TeslaOpenClawApp {
       text,
       requestId,
       onStart: () => {
+        this.state.responsePhase = 'waiting';
         this.render();
       },
       onDelta: (delta) => {
+        if (this.state.responsePhase !== 'streaming') {
+          this.stopWaitingIndicator();
+          this.state.responsePhase = 'streaming';
+        }
         this.updateOptimisticAssistantMessage(requestId, delta);
         this.render();
       },
     });
 
     if (!result.ok) {
+      this.stopWaitingIndicator();
       this.removeOptimisticMessages(requestId);
       this.state.draftText = text;
       this.state.isSendingText = false;
+      this.state.pendingAssistantMessageId = null;
       this.applyApiFailure(result, { kind: 'send-text', requestId, text });
       this.render();
       return;
     }
 
+    this.stopWaitingIndicator();
     this.replaceOptimisticMessages(requestId, result.data.userMessage, result.data.assistantMessage);
     this.state.isSendingText = false;
     this.state.status = 'idle';
     this.state.error = null;
     this.state.errorCode = null;
     this.state.retryAction = null;
+    this.state.responsePhase = 'idle';
+    this.state.pendingAssistantMessageId = null;
     this.persistState();
     this.render();
   }
@@ -674,12 +820,15 @@ export class TeslaOpenClawApp {
       optimisticUserMessage,
       optimisticAssistantMessage,
     ]);
-    this.shouldAutoScrollMessages = true;
+    this.state.messageFollowMode = 'follow';
     this.state.draftText = '';
     this.state.isSendingText = true;
     this.state.status = 'thinking';
     this.state.error = null;
     this.state.errorCode = null;
+    this.state.responsePhase = 'waiting';
+    this.state.pendingAssistantMessageId = optimisticAssistantMessage.messageId;
+    this.startWaitingIndicator();
     this.render();
 
     const result = await sendTextMessageStream({
@@ -689,28 +838,37 @@ export class TeslaOpenClawApp {
       text: action.text,
       requestId: action.requestId,
       onStart: () => {
+        this.state.responsePhase = 'waiting';
         this.render();
       },
       onDelta: (delta) => {
+        if (this.state.responsePhase !== 'streaming') {
+          this.stopWaitingIndicator();
+          this.state.responsePhase = 'streaming';
+        }
         this.updateOptimisticAssistantMessage(action.requestId, delta);
         this.render();
       },
     });
 
     if (!result.ok) {
+      this.stopWaitingIndicator();
       this.removeOptimisticMessages(action.requestId);
       this.state.draftText = action.text;
       this.state.isSendingText = false;
+      this.state.pendingAssistantMessageId = null;
       this.applyApiFailure(result, action);
       this.render();
       return;
     }
 
+    this.stopWaitingIndicator();
     this.replaceOptimisticMessages(action.requestId, result.data.userMessage, result.data.assistantMessage);
     this.state.isSendingText = false;
     this.state.status = 'idle';
     this.state.error = null;
-    this.state.errorCode = null;
+    this.state.responsePhase = 'idle';
+    this.state.pendingAssistantMessageId = null;
     this.persistState();
     this.render();
   }
@@ -732,7 +890,7 @@ export class TeslaOpenClawApp {
   }
 
   private updateOptimisticAssistantMessage(requestId: string, delta: string): void {
-    this.shouldAutoScrollMessages = true;
+    this.state.messageFollowMode = 'follow';
     this.state.messages = this.state.messages.map((message) =>
       message.messageId === `local_assistant_${requestId}`
         ? {
@@ -768,6 +926,6 @@ export class TeslaOpenClawApp {
     }
 
     this.state.messages = limitMessages(messages);
-    this.shouldAutoScrollMessages = true;
+    this.state.messageFollowMode = 'follow';
   }
 }

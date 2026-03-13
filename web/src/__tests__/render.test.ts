@@ -159,4 +159,74 @@ describe('renderApp', () => {
     expect(firstMessage).toBe(secondMessage);
     expect(secondMessage?.textContent).toContain('第一段第二段');
   });
+
+  it('renders waiting-first-token feedback inside the assistant placeholder', () => {
+    const root = document.createElement('div');
+    const state = createInitialState();
+    state.sessionId = 'sess_1';
+    state.responsePhase = 'waiting';
+    state.pendingAssistantMessageId = 'local_assistant_req_1';
+    state.waitingIndicatorFrame = 2;
+    state.messages = [
+      {
+        messageId: 'local_user_req_1',
+        sessionId: 'sess_1',
+        role: 'user',
+        content: '你好',
+        source: 'text',
+        createdAt: new Date().toISOString(),
+      },
+      {
+        messageId: 'local_assistant_req_1',
+        sessionId: 'sess_1',
+        role: 'assistant',
+        content: '',
+        source: 'llm',
+        createdAt: new Date().toISOString(),
+      },
+    ];
+
+    renderApp(root, state);
+
+    expect(root.textContent).toContain('正在等待回复...');
+  });
+
+  it('shows a back-to-bottom button while browsing history', () => {
+    const root = document.createElement('div');
+    const state = createInitialState();
+    state.sessionId = 'sess_1';
+    state.messageFollowMode = 'history';
+    state.messages = [
+      {
+        messageId: 'msg_1',
+        sessionId: 'sess_1',
+        role: 'assistant',
+        content: '历史消息',
+        source: 'llm',
+        createdAt: new Date().toISOString(),
+      },
+    ];
+
+    renderApp(root, state);
+
+    expect(root.querySelector('#back-to-bottom-button')).not.toBeNull();
+    expect(root.textContent).toContain('回到底部');
+  });
+
+  it('keeps the textarea editable while waiting for or streaming a reply', () => {
+    const root = document.createElement('div');
+    const state = createInitialState();
+    state.sessionId = 'sess_1';
+    state.responsePhase = 'waiting';
+
+    renderApp(root, state);
+    const waitingTextarea = root.querySelector<HTMLTextAreaElement>('#text-input');
+
+    state.responsePhase = 'streaming';
+    renderApp(root, state);
+    const streamingTextarea = root.querySelector<HTMLTextAreaElement>('#text-input');
+
+    expect(waitingTextarea?.disabled).toBe(false);
+    expect(streamingTextarea?.disabled).toBe(false);
+  });
 });

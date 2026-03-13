@@ -3,6 +3,7 @@ import type { Message } from '@tesla-openclaw/shared';
 import type { AppState } from './state.js';
 import { renderMarkdown, renderPlainText } from './render-markdown.js';
 import { statusLabelMap } from './state-machine.js';
+import { getComposerStatusView, getWaitingIndicatorText } from './ui-state.js';
 
 type MessageRefs = {
   article: HTMLElement;
@@ -21,8 +22,10 @@ type DomRefs = {
   networkText: HTMLElement;
   messages: HTMLElement;
   emptyState: HTMLElement;
+  backToBottomButton: HTMLButtonElement;
   textarea: HTMLTextAreaElement;
   sendButton: HTMLButtonElement;
+  composerStatus: HTMLElement;
   recoverButton: HTMLButtonElement;
   errorText: HTMLElement;
   messageRefs: Map<string, MessageRefs>;
@@ -61,7 +64,18 @@ const setHidden = (element: HTMLElement, hidden: boolean): void => {
   element.style.display = hidden ? 'none' : '';
 };
 
-const createMessageElement = (message: Message): MessageRefs => {
+const getMessageContentHtml = (message: Message, state: AppState): string => {
+  const isPendingWaitingMessage =
+    message.messageId === state.pendingAssistantMessageId && state.responsePhase === 'waiting';
+
+  if (isPendingWaitingMessage) {
+    return `<p class="message-content-text message-waiting-indicator">${getWaitingIndicatorText(state.waitingIndicatorFrame)}</p>`;
+  }
+
+  return message.role === 'assistant' ? renderMarkdown(message.content) : renderPlainText(message.content);
+};
+
+const createMessageElement = (message: Message, state: AppState): MessageRefs => {
   const article = createElement('article', {
     className: message.role === 'assistant' ? 'message message-assistant' : 'message message-user',
   });
@@ -83,11 +97,11 @@ const createMessageElement = (message: Message): MessageRefs => {
   shell.append(avatar, body);
   article.append(shell);
 
-  patchMessageElement({ article, content }, message);
+  patchMessageElement({ article, content }, message, state);
   return { article, content };
 };
 
-const patchMessageElement = (refs: MessageRefs, message: Message): void => {
+const patchMessageElement = (refs: MessageRefs, message: Message, state: AppState): void => {
   const nextClassName =
     message.role === 'assistant' ? 'message message-assistant' : 'message message-user';
   if (refs.article.className !== nextClassName) {
@@ -95,11 +109,15 @@ const patchMessageElement = (refs: MessageRefs, message: Message): void => {
   }
   refs.article.dataset.messageId = message.messageId;
 
-  const nextRenderedContent =
-    message.role === 'assistant' ? renderMarkdown(message.content) : renderPlainText(message.content);
+  const nextRenderedContent = getMessageContentHtml(message, state);
   if (refs.content.innerHTML !== nextRenderedContent) {
     refs.content.innerHTML = nextRenderedContent;
   }
+
+  refs.content.classList.toggle(
+    'message-content-waiting',
+    message.messageId === state.pendingAssistantMessageId && state.responsePhase === 'waiting',
+  );
 };
 
 const createAuthShell = () => {
@@ -170,6 +188,11 @@ const createChatShell = () => {
   emptyState.append(emptyTitle, emptyCopy);
   messages.append(emptyState);
 
+  const followBar = createElement('div', { className: 'follow-bar' });
+  const backToBottomButton = createElement('button', { className: 'secondary-button follow-button' });
+  backToBottomButton.id = 'back-to-bottom-button';
+  followBar.append(backToBottomButton);
+
   const composer = createElement('section', { className: 'composer' });
   const composerRow = createElement('div', { className: 'composer-row' });
   const textarea = createElement('textarea', { className: 'composer-input' });
@@ -180,13 +203,14 @@ const createChatShell = () => {
   composerRow.append(textarea, sendButton);
 
   const composerActions = createElement('div', { className: 'composer-actions' });
+  const composerStatus = createElement('span', { className: 'composer-status' });
   const recoverButton = createElement('button', { className: 'secondary-button' });
   recoverButton.id = 'recover-button';
   const errorText = createElement('span', { className: 'error-text' });
-  composerActions.append(recoverButton, errorText);
+  composerActions.append(composerStatus, recoverButton, errorText);
 
   composer.append(composerRow, composerActions);
-  chatShell.append(header, messages, composer);
+  chatShell.append(header, messages, followBar, composer);
 
   return {
     chatShell,
@@ -195,8 +219,10 @@ const createChatShell = () => {
     networkText,
     messages,
     emptyState,
+    backToBottomButton,
     textarea,
     sendButton,
+    composerStatus,
     recoverButton,
     errorText,
   };
@@ -244,10 +270,10 @@ const syncMessages = (refs: DomRefs, state: AppState): void => {
   for (const message of state.messages) {
     let messageRefs = refs.messageRefs.get(message.messageId);
     if (!messageRefs) {
-      messageRefs = createMessageElement(message);
+      messageRefs = createMessageElement(message, state);
       refs.messageRefs.set(message.messageId, messageRefs);
     } else {
-      patchMessageElement(messageRefs, message);
+      patchMessageElement(messageRefs, message, state);
     }
     orderedArticles.push(messageRefs.article);
   }
@@ -269,26 +295,39 @@ const syncMessages = (refs: DomRefs, state: AppState): void => {
 };
 
 const syncChatState = (refs: DomRefs, state: AppState): void => {
+  const composerStatus = getComposerStatusView(state);
+
   refs.statusText.textContent = `状态：${statusLabelMap[state.status]}`;
   refs.sessionText.textContent = state.sessionId ? '会话已连接' : '正在初始化';
   refs.networkText.textContent = state.networkOnline ? '网络在线' : '网络离线';
 
   refs.textarea.placeholder = inputHintText();
-  refs.textarea.disabled = state.isSendingText;
+  refs.textarea.disabled = false;
   if (refs.textarea.value !== state.draftText) {
     refs.textarea.value = state.draftText;
   }
 
   const hasDraftText = state.draftText.trim().length > 0;
   refs.sendButton.className = `icon-button send-icon-button${hasDraftText ? '' : ' send-icon-button-hidden'}`;
-  refs.sendButton.disabled = state.isSendingText || !state.sessionId || !hasDraftText;
-  refs.sendButton.setAttribute('aria-label', state.isSendingText ? '发送中' : '发送消息');
-  refs.sendButton.innerHTML = state.isSendingText ? '…' : sendIcon();
+  refs.sendButton.disabled = state.responsePhase !== 'idle' || !state.sessionId || !hasDraftText;
+  refs.sendButton.setAttribute(
+    'aria-label',
+    state.responsePhase === 'idle' ? '发送消息' : '请等待当前回复完成',
+  );
+  refs.sendButton.innerHTML = sendIcon();
+
+  refs.backToBottomButton.textContent =
+    state.responsePhase === 'idle' ? '回到底部' : '有新回复，回到底部';
+  setHidden(refs.backToBottomButton, state.messageFollowMode !== 'history' || state.messages.length === 0);
 
   const showRecoverButton = state.status === 'error';
   setHidden(refs.recoverButton, !showRecoverButton);
   refs.recoverButton.textContent = actionButtonLabel(state);
   refs.errorText.textContent = state.error ?? '';
+
+  refs.composerStatus.textContent = composerStatus.text ?? '';
+  refs.composerStatus.className = `composer-status composer-status-${composerStatus.tone}`;
+  setHidden(refs.composerStatus, composerStatus.text === null || composerStatus.kind === 'error');
 
   syncMessages(refs, state);
 };

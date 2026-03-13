@@ -18,6 +18,7 @@ body {
   margin: 0;
   min-height: 100vh;
   background: #f7f7f8;
+  overflow: hidden;
 }
 
 #app {
@@ -25,7 +26,9 @@ body {
   height: var(--app-viewport-height);
   --app-viewport-height: 100vh;
   --keyboard-inset: 0px;
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
   --shell-bottom-padding: calc(24px + var(--keyboard-inset));
+  overflow: hidden;
 }
 
 .shell {
@@ -33,10 +36,10 @@ body {
   min-height: 0;
   height: var(--app-viewport-height);
   margin: 0 auto;
-  padding: 20px 16px calc(var(--shell-bottom-padding) + env(safe-area-inset-bottom, 0px));
+  padding: 18px 16px calc(var(--shell-bottom-padding) + var(--safe-area-bottom));
   display: grid;
-  gap: 12px;
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 10px;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
 }
 
 .shell-auth {
@@ -113,29 +116,29 @@ body {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 16px;
+  gap: 10px;
 }
 
 .app-title {
-  font-size: clamp(28px, 3vw, 34px);
+  font-size: clamp(26px, 3vw, 32px);
   font-weight: 700;
   letter-spacing: -0.03em;
 }
 
 .status-bar {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   flex-wrap: wrap;
   justify-content: flex-end;
 }
 
 .status-pill {
-  padding: 8px 12px;
+  padding: 6px 10px;
   border-radius: 999px;
   border: 1px solid #e5e5ea;
   background: #fff;
   color: #6e6e80;
-  font-size: 15px;
+  font-size: 14px;
 }
 
 .messages {
@@ -202,6 +205,14 @@ body {
   line-height: 1.42;
   letter-spacing: -0.01em;
   word-break: break-word;
+}
+
+.message-content-waiting {
+  color: #4d4d5f;
+}
+
+.message-waiting-indicator {
+  min-height: 1.4em;
 }
 
 .message-content-text,
@@ -378,12 +389,28 @@ body {
 }
 
 .composer-actions {
-  min-height: 24px;
+  min-height: 26px;
   margin-top: 8px;
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
   align-items: center;
   justify-content: space-between;
+}
+
+.composer-status {
+  flex: 1;
+  min-width: 200px;
+  color: #6e6e80;
+  font-size: 16px;
+}
+
+.composer-status-busy {
+  color: #4d4d5f;
+}
+
+.composer-status-error {
+  color: #d63b3b;
 }
 
 .composer-tools {
@@ -417,13 +444,26 @@ body {
   font-size: 16px;
 }
 
+.follow-bar {
+  width: min(100%, 860px);
+  min-height: 0;
+  margin: 0 auto;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.follow-button {
+  min-width: 156px;
+  background: rgba(255, 255, 255, 0.96);
+}
+
 #app.keyboard-active .app-header {
-  gap: 10px;
+  gap: 8px;
 }
 
 @media (max-width: 720px) {
   .shell {
-    padding: 14px 12px calc(var(--shell-bottom-padding) + env(safe-area-inset-bottom, 0px));
+    padding: 14px 12px calc(var(--shell-bottom-padding) + var(--safe-area-bottom));
   }
 
   .app-header {
@@ -454,7 +494,12 @@ body {
     align-items: flex-start;
   }
 
+  .composer-status,
   .error-text {
     text-align: left;
+  }
+
+  .follow-bar {
+    justify-content: flex-start;
   }
 }
