@@ -9,3 +9,4 @@ coverage
 .env.local
 server/data
 server/uploads
+.DS_Store
