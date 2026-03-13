@@ -1,0 +1,37 @@
+schema: spec-driven
+
+context: |
+  项目：面向 Tesla 老款 Atom / MCU2 浏览器的 Tesla OpenClaw Client MVP。
+  主路径：Tesla 系统语音输入法 -> 文本输入框 -> 发送 -> SSE 文本流式回复。
+  产品边界：
+  - 以 Tesla 单端体验为第一优先级。
+  - 网页麦克风录音、ASR 上传、TTS 主导链路、手机协同都不属于当前 MVP。
+  - 大字文本多轮显示是主输出。
+  技术栈：
+  - 前端：Vanilla TypeScript + Vite + 原生 DOM API + 手写 CSS。
+  - 后端：Node.js + TypeScript + Fastify + Zod + Pino。
+  - 数据层：SQLite + Drizzle ORM。
+  工程约束：
+  - 优先保证老款 Tesla 浏览器兼容性，避免引入重型框架。
+  - 保持 SSE streaming 作为助手回复主链路。
+  - 保持 textarea、PIN 输入框、消息列表等稳定 DOM 壳体。
+  - shared PIN 门禁只允许做轻量单环境方案，不扩展成多用户账号系统。
+  验证基线：
+  - 本地验证和 Tesla 真机验证已经通过，当前结论为“Proceed with Caveats”。
+  - 临时 cloudflared 隧道仅用于测试，不应成为正式产品依赖。
+
+rules:
+  proposal:
+    - 重点描述用户可感知的行为变化以及影响到的 capability。
+    - 必须检查是否触碰 Tesla 兼容性边界和 MVP 产品范围。
+  specs:
+    - 只写规范性要求，不写实现过程。
+    - 优先描述稳定 capability 边界，而不是实现细节。
+    - 必须反映当前 Tesla 文本优先方向，不能回到历史上的网页录音上传方案。
+  design:
+    - 必须解释 Tesla 浏览器约束以及稳定 DOM/SSE 架构下的设计取舍。
+    - 未经明确 scope change，不得引入 React、Next.js、Vue、WebSocket 重构或手机协同架构。
+  tasks:
+    - 把工作拆成小而可验证的步骤。
+    - 除非任务本身明确无法执行，否则都应包含 `npm run lint`、`npm run typecheck`、`npm test`、`npm run build` 校验。
+    - 行为或工作流发生变化时，要显式包含 README 或文档更新任务。

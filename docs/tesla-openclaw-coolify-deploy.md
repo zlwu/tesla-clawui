@@ -1,5 +1,8 @@
 # Tesla OpenClaw Coolify 部署说明
 
+> 状态：部署参考文档。
+> 与 OpenSpec 的关系：不作为 capability 规范，保留为运维说明。
+
 适用场景：
 
 - 单节点 VPS

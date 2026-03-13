@@ -1,7 +1,8 @@
 # Tesla 车机 OpenClaw 客户端 API 文档（MVP）
 
+> 状态：历史参考文档，不再作为后续 OpenSpec 开发主依据。
+> 当前对应 OpenSpec：`shared-pin-auth`、`session-and-message-lifecycle`、`text-chat-streaming`
 > 2026-03-11 更新：网页录音、`POST /api/voice/input` 与 ASR 已从当前代码主线删除。本文件中仍残留的语音接口描述仅作历史设计参考，以文本接口为准。
-
 ## 1. 文档目标
 
 本文档定义 Tesla 车机 OpenClaw 客户端 MVP 所需的后端 API 契约。
@@ -192,11 +193,13 @@ Authorization: Bearer <sessionToken>
 
 - `role`: `user` | `assistant` | `system`
 - `content`: 纯文本内容
-- `source`: `text` | `voice_asr` | `llm` | `system`
+- `source`: `text` | `llm` | `system`
 
 ---
 
-## 4.3 Voice Result
+## 4.3 历史 Voice Result
+
+> 本节仅保留为早期语音方案的历史记录，当前主线不再使用。
 
 ```json
 {
@@ -383,99 +386,9 @@ Content-Type: application/json
 
 ## 5.4 语音输入
 
-### POST `/api/voice/input`
-
-上传语音并完成：
-
-```text
-录音上传 -> ASR -> LLM -> 返回文本结果
-```
-
-### Request
-
-#### Headers
-
-```http
-Authorization: Bearer <sessionToken>
-Content-Type: multipart/form-data
-```
-
-#### Form Data
-
-| 字段名 | 类型 | 必填 | 说明 |
-|---|---|---:|---|
-| sessionId | string | 是 | 会话 ID |
-| requestId | string | 是 | 请求唯一 ID，用于幂等 |
-| audio | file | 是 | 录音文件 |
-| mimeType | string | 否 | 音频 MIME 类型 |
-| language | string | 否 | 识别语言，默认 `zh-CN` |
-
-### 示例
-
-- `audio`: `blob`
-- `mimeType`: `audio/webm;codecs=opus`
-- `language`: `zh-CN`
-
-### Response 200
-
-```json
-{
-  "ok": true,
-  "data": {
-    "requestId": "req_voice_001",
-    "sessionId": "sess_123",
-    "transcript": "今天天气怎么样",
-    "userMessage": {
-      "messageId": "msg_user_002",
-      "sessionId": "sess_123",
-      "role": "user",
-      "content": "今天天气怎么样",
-      "source": "voice_asr",
-      "createdAt": "2026-03-09T11:12:00.000Z"
-    },
-    "assistantMessage": {
-      "messageId": "msg_asst_002",
-      "sessionId": "sess_123",
-      "role": "assistant",
-      "content": "今天上海多云，气温大约 18 到 24 度。",
-      "source": "llm",
-      "createdAt": "2026-03-09T11:12:04.000Z"
-    },
-    "status": "idle"
-  }
-}
-```
-
-### 可选扩展响应字段
-
-```json
-{
-  "audioUrl": "/api/audio/aud_001"
-}
-```
-
-### 幂等约定
-
-如果同一个 `requestId` 已成功处理过，服务端应：
-
-- 返回已有结果，或
-- 返回明确冲突信息
-
-推荐优先返回已有结果，避免前端重复提交导致重复消息。
-
-### 错误
-
-- `VALIDATION_FAILED`
-- `SESSION_NOT_FOUND`
-- `UNSUPPORTED_MEDIA_TYPE`
-- `AUDIO_UPLOAD_FAILED`
-- `AUDIO_FILE_INVALID`
-- `ASR_FAILED`
-- `ASR_TIMEOUT`
-- `LLM_FAILED`
-- `LLM_TIMEOUT`
-- `REQUEST_CONFLICT`
-- `INTERNAL_ERROR`
+> 历史接口说明：`POST /api/voice/input` 已从当前代码主线删除。
+> 当前主路径固定为：系统语音输入法 / 长按系统语音键输入 -> 文本框 -> `POST /api/text/input` 或 `POST /api/text/input/stream`。
+> 若未来要重新引入网页录音能力，必须先通过新的 OpenSpec change 明确恢复该 capability，而不是直接按本文继续实现。
 
 ---
 
@@ -511,7 +424,7 @@ GET /api/messages?sessionId=sess_123&limit=8
         "sessionId": "sess_123",
         "role": "user",
         "content": "今天天气怎么样",
-        "source": "voice_asr",
+        "source": "text",
         "createdAt": "2026-03-09T11:12:00.000Z"
       },
       {
@@ -608,14 +521,7 @@ Content-Type: audio/mpeg
 
 ## 6.3 语音对话流程
 
-```text
-用户点击录音
- -> 前端录音完成
- -> POST /api/voice/input (multipart)
- -> 服务端做 ASR + LLM
- -> 返回 transcript + userMessage + assistantMessage
- -> 前端更新消息区
-```
+> 历史流程说明：本流程已从当前产品主线移除，仅保留用于解释早期接口设计。
 
 ---
 
@@ -624,10 +530,10 @@ Content-Type: audio/mpeg
 | 前端状态 | 触发时机 | 对应接口/行为 |
 |---|---|---|
 | idle | 空闲 | 无 |
-| recording | 用户开始录音 | MediaRecorder |
-| uploading | 录音结束后上传 | `POST /api/voice/input` |
-| transcribing | 服务端识别中 | `/api/voice/input` 服务端内部阶段 |
-| thinking | LLM 回复中 | `/api/voice/input` 或 `/api/text/input` 服务端内部阶段 |
+| recording | 历史状态，当前主线未使用 | 历史录音方案 |
+| uploading | 历史状态，当前主线未使用 | 历史上传方案 |
+| transcribing | 历史状态，当前主线未使用 | 历史 ASR 阶段 |
+| thinking | LLM 回复中 | `/api/text/input` 或 `/api/text/input/stream` |
 | error | 任意失败 | 错误响应 |
 
 说明：
@@ -643,10 +549,9 @@ Content-Type: audio/mpeg
 - `text`: 建议最大 4000 字符
 - 超过限制返回 `VALIDATION_FAILED`
 
-## 8.2 语音文件大小
+## 8.2 历史语音文件大小约束
 
-- 建议首版限制在 10MB 内
-- 超限返回 `AUDIO_FILE_INVALID` 或 `VALIDATION_FAILED`
+> 当前主线不再使用本约束；仅保留为早期语音上传方案记录。
 
 ## 8.3 limit 参数
 
@@ -658,7 +563,7 @@ Content-Type: audio/mpeg
 
 ## 9. 示例错误响应
 
-## 9.1 语音文件格式不支持
+## 9.1 历史示例：语音文件格式不支持
 
 ```json
 {
@@ -674,7 +579,7 @@ Content-Type: audio/mpeg
 }
 ```
 
-## 9.2 ASR 超时
+## 9.2 历史示例：ASR 超时
 
 ```json
 {
@@ -710,21 +615,19 @@ Content-Type: audio/mpeg
 
 - `session-service`
 - `message-service`
-- `asr-service`
 - `llm-service`
 - `tts-service`（可选）
 
-### `/api/voice/input` 内部步骤建议
+### 当前文本主链路内部步骤建议
 
 1. 校验 session
 2. 校验 requestId
-3. 接收与保存音频
-4. 调用 ASR
+3. 接收文本输入
+4. 组装上下文并调用 LLM / OpenClaw
 5. 生成 userMessage
-6. 组装上下文并调用 LLM
-7. 生成 assistantMessage
-8. 返回结果
-9. 可选生成 TTS
+6. 生成 assistantMessage 或流式增量
+7. 返回结果
+8. 可选生成 TTS
 
 ---
 
@@ -744,4 +647,4 @@ Content-Type: audio/mpeg
 
 ## 12. 一句话 API 原则
 
-> API 先服务于“语音输入 + 大字文本多轮”这条主链路；扩展能力可以预留字段，但不要反过来绑架首版实现。
+> API 先服务于“系统语音输入法辅助输入 + 文本发送 + 大字文本多轮”这条主链路；扩展能力可以预留字段，但不要反过来绑架首版实现。

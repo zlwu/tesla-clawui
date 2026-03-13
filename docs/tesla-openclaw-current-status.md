@@ -1,5 +1,8 @@
 # Tesla OpenClaw 当前状态
 
+> 状态：当前实现与验证快照文档。
+> 与 OpenSpec 的关系：用于记录现状，不替代 `openspec/specs/*/spec.md` 的规范性要求。
+
 ## 当前进度
 
 - Phase 0：完成

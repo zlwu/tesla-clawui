@@ -11,11 +11,11 @@ Tesla OpenClaw 项目的后续开发必须遵守以下规则。
 
 发生冲突时按以下优先级执行：
 
-1. `docs/tesla-openclaw-project-overview.md`
-2. `docs/tesla-openclaw-mvp-validation-plan.md`
-3. `docs/tesla-openclaw-client-tech-spec.md`
-4. `docs/tesla-openclaw-client-api.md`
-5. `docs/tesla-openclaw-client-tasks.md`
+1. 活跃变更：`openspec/changes/<change-name>/tasks.md`、`openspec/changes/<change-name>/design.md`、`openspec/changes/<change-name>/proposal.md`
+2. 稳定基线：`openspec/specs/*/spec.md`
+3. 项目约束：`openspec/README.md`、`openspec/config.yaml`
+4. 历史参考：`docs/README.md`
+5. legacy 文档：`docs/tesla-openclaw-project-overview.md`、`docs/tesla-openclaw-mvp-validation-plan.md`、`docs/tesla-openclaw-client-tech-spec.md`、`docs/tesla-openclaw-client-api.md`、`docs/tesla-openclaw-client-tasks.md`
 
 ## 不可偏离的产品边界
 
@@ -66,6 +66,8 @@ Tesla OpenClaw 项目的后续开发必须遵守以下规则。
 
 ## 开发约定
 
+- 后续需求开发默认先读 `openspec/specs/*/spec.md`；如果是新需求或需求变更，先创建或更新 `openspec/changes/*`
+- 没有对应 OpenSpec change 时，不要直接把 legacy `docs/*` 当成当前实施依据
 - 每次改动后优先执行 `npm run lint`、`npm run typecheck`、`npm test`、`npm run build`
 - 先补文档再扩功能时，要同步更新 `README.md`
 - 涉及文本输出体验时，默认建立在现有 SSE streaming 主链路之上，不回退到轮询或 WebSocket 重构

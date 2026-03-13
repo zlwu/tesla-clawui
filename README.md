@@ -2,6 +2,21 @@
 
 面向 Tesla 老款 Atom / MCU2 浏览器的 OpenClaw 单端客户端。
 
+## 文档入口
+
+- 后续需求开发主入口：`openspec/README.md`
+- 当前稳定能力基线：`openspec/specs/*/spec.md`
+- 历史与运维参考：`docs/README.md`
+
+## OpenSpec 开发流程
+
+1. 先阅读相关 `openspec/specs/*/spec.md`，确认当前稳定基线。
+2. 新需求、行为变更或范围调整，先创建 `openspec/changes/<change-name>/`。
+3. 在 change 下完成 `proposal.md`、`design.md`、`tasks.md`，再进入实现。
+4. 实现完成并验证通过后，归档 change，并把变更吸收到主 spec。
+
+如果 `docs/` 中的历史文档与 OpenSpec 基线冲突，以 `openspec/` 为准。
+
 ## 当前范围
 
 - Phase 0：单仓初始化、规范、配置、SQLite + Drizzle
@@ -47,6 +62,8 @@
 - `npm run typecheck`：执行 TypeScript 严格检查
 - `npm run test`：执行 Vitest
 - `npm run smoke:openclaw`：对当前运行中的服务执行一次 OpenClaw 文本主链路冒烟
+- `openspec list --specs`：查看当前 OpenSpec capability 基线
+- `openspec validate --specs`：校验 OpenSpec 基线结构
 
 ## 环境变量
 
