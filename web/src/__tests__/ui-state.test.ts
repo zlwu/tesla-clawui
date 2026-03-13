@@ -69,7 +69,7 @@ describe('ui-state helpers', () => {
     });
 
     expect(metrics.source).toBe('focus-fallback');
-    expect(metrics.keyboardInset).toBe(287);
+    expect(metrics.keyboardInset).toBe(380);
   });
 
   it('keeps the fallback inset high enough for tall touch keyboards', () => {
@@ -83,7 +83,7 @@ describe('ui-state helpers', () => {
     });
 
     expect(metrics.source).toBe('focus-fallback');
-    expect(metrics.keyboardInset).toBe(220);
+    expect(metrics.keyboardInset).toBe(310);
   });
 
   it('does not cap the fallback inset on medium-height viewports', () => {
@@ -97,7 +97,7 @@ describe('ui-state helpers', () => {
     });
 
     expect(metrics.source).toBe('focus-fallback');
-    expect(metrics.keyboardInset).toBe(220);
+    expect(metrics.keyboardInset).toBe(300);
   });
 
   it('caps the fallback inset to preserve reachable space on short viewports', () => {
