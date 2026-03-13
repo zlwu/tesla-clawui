@@ -19,6 +19,11 @@ export type KeyboardLayoutMetrics = {
 };
 
 const KEYBOARD_LAYOUT_THRESHOLD = 80;
+const FOCUS_FALLBACK_MIN_INSET = 220;
+const FOCUS_FALLBACK_MAX_INSET = 320;
+const FOCUS_FALLBACK_RATIO = 0.35;
+const MIN_REACHABLE_VIEWPORT_HEIGHT = 220;
+const SHORT_VIEWPORT_FALLBACK_LIMIT = 360;
 
 export const getWaitingIndicatorSuffix = (frame: number): string =>
   WAITING_INDICATOR_FRAMES[((frame % WAITING_INDICATOR_FRAMES.length) + WAITING_INDICATOR_FRAMES.length) % WAITING_INDICATOR_FRAMES.length] ?? WAITING_INDICATOR_FRAMES[0];
@@ -103,9 +108,23 @@ export const resolveKeyboardLayout = (params: {
   }
 
   if (params.allowFallbackInset) {
+    const preferredInset = Math.min(
+      Math.max(Math.round(layoutViewportHeight * FOCUS_FALLBACK_RATIO), FOCUS_FALLBACK_MIN_INSET),
+      FOCUS_FALLBACK_MAX_INSET,
+    );
+
     return {
       viewportHeight: layoutViewportHeight,
-      keyboardInset: Math.min(Math.max(Math.round(layoutViewportHeight * 0.22), 120), 180),
+      // Tesla can fail to expose reliable viewport changes while still showing
+      // a tall IME panel, so the fallback inset needs to prioritize composer reachability
+      // without collapsing genuinely short viewports that also rely on this path.
+      keyboardInset:
+        layoutViewportHeight <= SHORT_VIEWPORT_FALLBACK_LIMIT
+          ? Math.max(
+              Math.min(preferredInset, Math.max(layoutViewportHeight - MIN_REACHABLE_VIEWPORT_HEIGHT, 0)),
+              0,
+            )
+          : preferredInset,
       source: 'focus-fallback',
     };
   }

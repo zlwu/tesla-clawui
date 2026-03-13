@@ -69,6 +69,48 @@ describe('ui-state helpers', () => {
     });
 
     expect(metrics.source).toBe('focus-fallback');
-    expect(metrics.keyboardInset).toBeGreaterThan(0);
+    expect(metrics.keyboardInset).toBe(287);
+  });
+
+  it('keeps the fallback inset high enough for tall touch keyboards', () => {
+    const metrics = resolveKeyboardLayout({
+      keyboardMode: true,
+      layoutViewportHeight: 620,
+      baselineLayoutViewportHeight: 620,
+      visualViewportHeight: null,
+      visualViewportOffsetTop: null,
+      allowFallbackInset: true,
+    });
+
+    expect(metrics.source).toBe('focus-fallback');
+    expect(metrics.keyboardInset).toBe(220);
+  });
+
+  it('does not cap the fallback inset on medium-height viewports', () => {
+    const metrics = resolveKeyboardLayout({
+      keyboardMode: true,
+      layoutViewportHeight: 400,
+      baselineLayoutViewportHeight: 400,
+      visualViewportHeight: null,
+      visualViewportOffsetTop: null,
+      allowFallbackInset: true,
+    });
+
+    expect(metrics.source).toBe('focus-fallback');
+    expect(metrics.keyboardInset).toBe(220);
+  });
+
+  it('caps the fallback inset to preserve reachable space on short viewports', () => {
+    const metrics = resolveKeyboardLayout({
+      keyboardMode: true,
+      layoutViewportHeight: 320,
+      baselineLayoutViewportHeight: 320,
+      visualViewportHeight: null,
+      visualViewportOffsetTop: null,
+      allowFallbackInset: true,
+    });
+
+    expect(metrics.source).toBe('focus-fallback');
+    expect(metrics.keyboardInset).toBe(100);
   });
 });
