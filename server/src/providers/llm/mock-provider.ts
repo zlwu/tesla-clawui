@@ -1,4 +1,9 @@
-import type { LlmGenerateInput, LlmProvider, LlmStreamCallbacks } from './provider.js';
+import type {
+  LlmGenerateInput,
+  LlmProvider,
+  LlmStreamCallbacks,
+  LlmStreamResult,
+} from './provider.js';
 
 export class MockLlmProvider implements LlmProvider {
   public generateReply(input: LlmGenerateInput): Promise<string> {
@@ -11,12 +16,24 @@ export class MockLlmProvider implements LlmProvider {
   public async generateReplyStream(
     input: LlmGenerateInput,
     callbacks: LlmStreamCallbacks,
-  ): Promise<string> {
+  ): Promise<LlmStreamResult> {
     const reply = await this.generateReply(input);
+    let deltaCount = 0;
     for (const chunk of reply.match(/.{1,12}/gu) ?? []) {
+      deltaCount += 1;
       await callbacks.onDelta(chunk);
     }
 
-    return reply;
+    return {
+      replyText: reply,
+      diagnostics: {
+        provider: 'mock',
+        completionMarkerObserved: true,
+        finishReason: 'stop',
+        deltaCount,
+        characterCount: reply.length,
+        terminationReason: 'mock_stream_complete',
+      },
+    };
   }
 }

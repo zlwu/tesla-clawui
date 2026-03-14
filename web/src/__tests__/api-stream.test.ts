@@ -83,4 +83,55 @@ describe('sendTextMessageStream', () => {
       expect(result.data.assistantMessage.content).toBe('你好，世界');
     }
   });
+
+  it('returns retryable failure when SSE stream ends before done/error', async () => {
+    const chunks = [
+      'event: start\n',
+      'data: {"sessionId":"sess_1","requestId":"req_2"}\n\n',
+      'event: delta\n',
+      'data: {"delta":"半句"}\n\n',
+    ];
+
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        const encoder = new TextEncoder();
+        for (const chunk of chunks) {
+          controller.enqueue(encoder.encode(chunk));
+        }
+        controller.close();
+      },
+    });
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(stream, {
+          status: 200,
+          headers: {
+            'content-type': 'text/event-stream; charset=utf-8',
+          },
+        }),
+      ),
+    );
+
+    const deltas: string[] = [];
+    const result = await sendTextMessageStream({
+      sessionId: 'sess_1',
+      sessionToken: 'token_1',
+      text: 'hello',
+      requestId: 'req_2',
+      onStart: () => {},
+      onDelta: (delta) => {
+        deltas.push(delta);
+      },
+    });
+
+    expect(deltas).toEqual(['半句']);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe('SERVICE_UNAVAILABLE');
+      expect(result.error.retryable).toBe(true);
+      expect(result.error.message).toBe('流式响应提前结束，请稍后重试');
+    }
+  });
 });

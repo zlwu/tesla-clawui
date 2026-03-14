@@ -1,7 +1,7 @@
 import { AppException } from '../../lib/errors.js';
 import type { AppConfig } from '../../lib/config.js';
 import { readOpenAiCompatibleStream } from './openai-stream.js';
-import type { LlmGenerateInput, LlmProvider, LlmStreamCallbacks } from './provider.js';
+import type { LlmGenerateInput, LlmProvider, LlmStreamCallbacks, LlmStreamResult } from './provider.js';
 
 const systemPrompt = '你是 Tesla 车机里的 OpenClaw 助手。回答简洁、清晰、适合大字文本显示。';
 
@@ -61,7 +61,7 @@ export class OpenAiCompatibleProvider implements LlmProvider {
   public async generateReplyStream(
     input: LlmGenerateInput,
     callbacks: LlmStreamCallbacks,
-  ): Promise<string> {
+  ): Promise<LlmStreamResult> {
     if (!this.config.llmBaseUrl || !this.config.llmApiKey) {
       throw new AppException(500, {
         code: 'LLM_FAILED',
@@ -97,6 +97,7 @@ export class OpenAiCompatibleProvider implements LlmProvider {
     }
 
     return readOpenAiCompatibleStream({
+      provider: 'openai-compatible',
       response,
       onDelta: (delta) => callbacks.onDelta(delta),
       emptyMessage: 'LLM 返回为空',

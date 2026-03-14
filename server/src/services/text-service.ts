@@ -165,7 +165,7 @@ export class TextService {
         await params.onStart();
 
         const history = await this.messageService.listHistory(params.sessionId, 12);
-        const replyText = await this.llmService.generateReplyStream({
+        const streamResult = await this.llmService.generateReplyStream({
           sessionId: params.sessionId,
           requestId: params.requestId,
           text: trimmed,
@@ -173,6 +173,29 @@ export class TextService {
           onDelta: (delta) => params.onDelta(delta),
           logger: params.logger,
         });
+        params.logger?.info(
+          {
+            sessionId: params.sessionId,
+            requestId: params.requestId,
+            ...streamResult.diagnostics,
+            finalRequestOutcome: streamResult.diagnostics.completionMarkerObserved
+              ? 'persisting'
+              : 'error',
+          },
+          'text.stream.outcome',
+        );
+
+        if (!streamResult.diagnostics.completionMarkerObserved) {
+          throw new AppException(502, {
+            code: 'LLM_FAILED',
+            message: '上游流式响应提前结束，请重试',
+            retryable: true,
+            details: {
+              ...streamResult.diagnostics,
+              finalRequestOutcome: 'error',
+            },
+          });
+        }
 
         const userMessage = await this.messageService.create({
           sessionId: params.sessionId,
@@ -184,7 +207,7 @@ export class TextService {
         const assistantMessage = await this.messageService.create({
           sessionId: params.sessionId,
           role: 'assistant',
-          content: replyText,
+          content: streamResult.replyText,
           source: 'llm',
           requestId: params.requestId,
         });
@@ -209,6 +232,13 @@ export class TextService {
             sessionId: params.sessionId,
             requestId: params.requestId,
             mode: 'stream',
+            provider: streamResult.diagnostics.provider,
+            completionMarkerObserved: streamResult.diagnostics.completionMarkerObserved,
+            finishReason: streamResult.diagnostics.finishReason,
+            deltaCount: streamResult.diagnostics.deltaCount,
+            characterCount: streamResult.diagnostics.characterCount,
+            terminationReason: streamResult.diagnostics.terminationReason,
+            finalRequestOutcome: 'done',
           },
         });
 
@@ -224,6 +254,7 @@ export class TextService {
             sessionId: params.sessionId,
             requestId: params.requestId,
             mode: 'stream',
+            finalRequestOutcome: 'error',
           },
         });
         throw error;

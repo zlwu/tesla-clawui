@@ -14,7 +14,21 @@ export type LlmStreamCallbacks = {
   onDelta(delta: string): Promise<void> | void;
 };
 
+export type LlmStreamDiagnostics = {
+  provider: string;
+  completionMarkerObserved: boolean;
+  finishReason: string | null;
+  deltaCount: number;
+  characterCount: number;
+  terminationReason: string;
+};
+
+export type LlmStreamResult = {
+  replyText: string;
+  diagnostics: LlmStreamDiagnostics;
+};
+
 export type LlmProvider = {
   generateReply(input: LlmGenerateInput): Promise<string>;
-  generateReplyStream(input: LlmGenerateInput, callbacks: LlmStreamCallbacks): Promise<string>;
+  generateReplyStream(input: LlmGenerateInput, callbacks: LlmStreamCallbacks): Promise<LlmStreamResult>;
 };

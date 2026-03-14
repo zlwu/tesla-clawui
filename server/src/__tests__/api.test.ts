@@ -1,7 +1,7 @@
 import { rmSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createApp } from '../app.js';
 
@@ -17,6 +17,12 @@ describe('server api', () => {
     process.env.AUTH_ENABLED = 'false';
     delete process.env.AUTH_SHARED_PIN;
     process.env.LLM_PROVIDER = 'mock';
+    delete process.env.LLM_BASE_URL;
+    delete process.env.LLM_API_KEY;
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it('handles text input and recent messages', async () => {
@@ -232,6 +238,113 @@ describe('server api', () => {
       },
     });
     expect(createResponse.statusCode).toBe(200);
+
+    await app.close();
+  });
+
+  it('returns SSE error and does not persist partial replies when upstream stream truncates', async () => {
+    process.env.LLM_PROVIDER = 'openai-compatible';
+    process.env.LLM_BASE_URL = 'http://127.0.0.1:8899/v1/chat/completions';
+    process.env.LLM_API_KEY = 'test-token';
+
+    const truncatedStream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        const encoder = new TextEncoder();
+        controller.enqueue(encoder.encode('data: {"choices":[{"delta":{"content":"半句"}}]}\n\n'));
+        controller.close();
+      },
+    });
+    const completeStream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        const encoder = new TextEncoder();
+        controller.enqueue(encoder.encode('data: {"choices":[{"delta":{"content":"完整"}}]}\n\n'));
+        controller.enqueue(encoder.encode('data: {"choices":[{"delta":{"content":"回复"}}]}\n\n'));
+        controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+        controller.close();
+      },
+    });
+
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(truncatedStream, {
+          status: 200,
+          headers: {
+            'content-type': 'text/event-stream; charset=utf-8',
+          },
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(completeStream, {
+          status: 200,
+          headers: {
+            'content-type': 'text/event-stream; charset=utf-8',
+          },
+        }),
+      );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { app } = createApp();
+    const createResponse = await app.inject({
+      method: 'POST',
+      url: '/api/session/create',
+      payload: {
+        device: { type: 'tesla-browser', label: 'tesla-mcu2' },
+      },
+    });
+    const createPayload = createResponse.json<{ data: { session: { sessionId: string }; sessionToken: string } }>();
+    const requestId = createRequestId('req_text_stream_retry');
+
+    const firstTry = await app.inject({
+      method: 'POST',
+      url: '/api/text/input/stream',
+      headers: {
+        authorization: `Bearer ${createPayload.data.sessionToken}`,
+      },
+      payload: {
+        sessionId: createPayload.data.session.sessionId,
+        text: '第一次',
+        requestId,
+      },
+    });
+
+    expect(firstTry.statusCode).toBe(200);
+    expect(firstTry.body).toContain('event: start');
+    expect(firstTry.body).toContain('event: delta');
+    expect(firstTry.body).toContain('event: error');
+    expect(firstTry.body).not.toContain('event: done');
+    expect(firstTry.body).toContain('"code":"LLM_FAILED"');
+
+    const messagesAfterFail = await app.services.messageService.listRecent(
+      createPayload.data.session.sessionId,
+      8,
+    );
+    expect(messagesAfterFail).toHaveLength(0);
+
+    const secondTry = await app.inject({
+      method: 'POST',
+      url: '/api/text/input/stream',
+      headers: {
+        authorization: `Bearer ${createPayload.data.sessionToken}`,
+      },
+      payload: {
+        sessionId: createPayload.data.session.sessionId,
+        text: '第一次',
+        requestId,
+      },
+    });
+
+    expect(secondTry.statusCode).toBe(200);
+    expect(secondTry.body).toContain('event: done');
+    expect(secondTry.body).toContain('完整回复');
+
+    const messagesAfterSuccess = await app.services.messageService.listRecent(
+      createPayload.data.session.sessionId,
+      8,
+    );
+    expect(messagesAfterSuccess).toHaveLength(2);
+    expect(messagesAfterSuccess[0]?.role).toBe('user');
+    expect(messagesAfterSuccess[1]?.role).toBe('assistant');
 
     await app.close();
   });

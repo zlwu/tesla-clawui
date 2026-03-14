@@ -119,6 +119,74 @@ describe('OpenClawProvider', () => {
 
     expect(requestBody?.model).toBe('openclaw:ops');
   });
+
+  it('returns stream diagnostics when upstream stream completes', async () => {
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        const encoder = new TextEncoder();
+        controller.enqueue(encoder.encode('data: {"choices":[{"delta":{"content":"OpenClaw"}}]}\n\n'));
+        controller.enqueue(encoder.encode('data: {"choices":[{"delta":{"content":" stream"}}]}\n\n'));
+        controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+        controller.close();
+      },
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(stream, {
+          status: 200,
+          headers: {
+            'content-type': 'text/event-stream; charset=utf-8',
+          },
+        }),
+      ),
+    );
+
+    const provider = new OpenClawProvider(createConfig());
+    const result = await provider.generateReplyStream(
+      {
+        sessionId: 'sess_123',
+        requestId: 'req_stream_ok',
+        text: '你好',
+        history: [],
+      },
+      { onDelta: () => {} },
+    );
+
+    expect(result.replyText).toBe('OpenClaw stream');
+    expect(result.diagnostics.provider).toBe('openclaw');
+    expect(result.diagnostics.completionMarkerObserved).toBe(true);
+    expect(result.diagnostics.deltaCount).toBe(2);
+  });
+
+  it('throws a stable stream error when upstream call fails', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 503,
+      }),
+    );
+
+    const provider = new OpenClawProvider(createConfig());
+
+    await expect(
+      provider.generateReplyStream(
+        {
+          sessionId: 'sess_123',
+          requestId: 'req_stream_fail',
+          text: '你好',
+          history: [],
+        },
+        { onDelta: () => {} },
+      ),
+    ).rejects.toMatchObject({
+      payload: {
+        code: 'LLM_FAILED',
+        message: 'OpenClaw 服务调用失败',
+      },
+    });
+  });
 });
 
 const parseRequestBody = (

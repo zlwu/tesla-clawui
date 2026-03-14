@@ -6,12 +6,14 @@ import { logStepFailure, logStepSuccess } from '../lib/observability.js';
 import { MockLlmProvider } from '../providers/llm/mock-provider.js';
 import { OpenClawProvider } from '../providers/llm/openclaw-provider.js';
 import { OpenAiCompatibleProvider } from '../providers/llm/openai-compatible-provider.js';
-import type { LlmProvider } from '../providers/llm/provider.js';
+import type { LlmProvider, LlmStreamResult } from '../providers/llm/provider.js';
 
 export class LlmService {
   private readonly provider: LlmProvider;
+  private readonly providerName: AppConfig['llmProvider'];
 
   public constructor(config: AppConfig) {
+    this.providerName = config.llmProvider;
     this.provider =
       config.llmProvider === 'openclaw'
         ? new OpenClawProvider(config)
@@ -75,11 +77,11 @@ export class LlmService {
     history: Message[];
     onDelta(delta: string): Promise<void> | void;
     logger?: FastifyBaseLogger | undefined;
-  }): Promise<string> {
+  }): Promise<LlmStreamResult> {
     const startedAt = Date.now();
 
     try {
-      const reply = await this.provider.generateReplyStream(
+      const streamResult = await this.provider.generateReplyStream(
         {
           sessionId: params.sessionId,
           requestId: params.requestId,
@@ -101,10 +103,17 @@ export class LlmService {
           requestId: params.requestId,
           historyCount: params.history.length,
           mode: 'stream',
+          provider: this.providerName,
+          completionMarkerObserved: streamResult.diagnostics.completionMarkerObserved,
+          finishReason: streamResult.diagnostics.finishReason,
+          deltaCount: streamResult.diagnostics.deltaCount,
+          characterCount: streamResult.diagnostics.characterCount,
+          terminationReason: streamResult.diagnostics.terminationReason,
+          streamOutcome: 'success',
         },
       });
 
-      return reply;
+      return streamResult;
     } catch (error) {
       logStepFailure({
         logger: params.logger,
@@ -116,6 +125,8 @@ export class LlmService {
           requestId: params.requestId,
           historyCount: params.history.length,
           mode: 'stream',
+          provider: this.providerName,
+          streamOutcome: 'error',
         },
       });
       throw error;

@@ -31,6 +31,7 @@
 - 真实 provider 联调已通过：`OpenClaw Gateway LLM`
 - 本地 OpenClaw Gateway HTTP chat endpoint 已完成真实 `/api/text/input` 联调
 - 文本主链路已支持 SSE streaming，assistant 回复可边输出边显示
+- 服务端已校验上游流式 completion 信号，只有明确完成的回复才会落库并返回 `done`
 - assistant 消息已支持受控 Markdown 子集渲染：标题、列表、引用、粗体、行内代码、代码块
 - 消息区与输入区布局已收口为真实占位底栏；初始进入和流式输出默认定位到最新消息
 - 已支持基于 `.env` 的 shared PIN 门禁，解锁后再进入当前 Tesla 会话
@@ -46,6 +47,7 @@
 - 当前主界面交互已收口为：发送后分离“等待首包”和“正在回复”两段状态，等待首包使用轻量 ASCII 点动画提示
 - 当前 Tesla / iOS 键盘避让策略已收口为：优先吃 layout viewport resize，其次 `visualViewport`，最后才退回 focus 驱动保守底部留白
 - 当前渲染层已切到稳定 DOM 壳体 + 局部 patch，以保住焦点、滚动和 streaming 期间的节点稳定性
+- 若出现“回复说到一半停止但车机端无浏览器日志”的排障场景，当前应优先查看后端结构化日志中的上游流 completion 诊断字段
 
 ## 目录
 
