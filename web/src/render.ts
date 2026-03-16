@@ -41,7 +41,43 @@ const actionButtonLabel = (state: AppState): string =>
 
 const sendIcon = () => `
   <svg viewBox="0 0 20 20" aria-hidden="true" class="button-icon">
-    <path d="M4 10.2 15.4 4.8c.8-.4 1.6.4 1.2 1.2L11.2 17.4c-.3.7-1.3.7-1.6 0l-1.7-4-4-1.7c-.7-.3-.7-1.3.1-1.5Z" fill="currentColor"/>
+    <path
+      d="M10 15.2V5.4"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="1.7"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+    <path
+      d="M5.9 8.5 10 4.4l4.1 4.1"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="1.7"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+  </svg>
+`;
+
+const backToBottomIcon = () => `
+  <svg viewBox="0 0 20 20" aria-hidden="true" class="button-icon">
+    <path
+      d="M5.8 6.6 10 10.8l4.2-4.2"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="1.7"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+    <path
+      d="M5.8 10.4 10 14.6l4.2-4.2"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="1.7"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
   </svg>
 `;
 
@@ -188,10 +224,10 @@ const createChatShell = () => {
   emptyState.append(emptyTitle, emptyCopy);
   messages.append(emptyState);
 
-  const followBar = createElement('div', { className: 'follow-bar' });
-  const backToBottomButton = createElement('button', { className: 'secondary-button follow-button' });
+  const composerDock = createElement('div', { className: 'composer-dock' });
+  const backToBottomButton = createElement('button', { className: 'icon-button follow-button' });
   backToBottomButton.id = 'back-to-bottom-button';
-  followBar.append(backToBottomButton);
+  backToBottomButton.type = 'button';
 
   const composer = createElement('section', { className: 'composer' });
   const composerRow = createElement('div', { className: 'composer-row' });
@@ -210,7 +246,8 @@ const createChatShell = () => {
   composerActions.append(composerStatus, recoverButton, errorText);
 
   composer.append(composerRow, composerActions);
-  chatShell.append(header, messages, followBar, composer);
+  composerDock.append(backToBottomButton, composer);
+  chatShell.append(header, messages, composerDock);
 
   return {
     chatShell,
@@ -316,7 +353,12 @@ const syncChatState = (refs: DomRefs, state: AppState): void => {
   );
   refs.sendButton.innerHTML = sendIcon();
 
-  refs.backToBottomButton.textContent =
+  refs.backToBottomButton.innerHTML = backToBottomIcon();
+  refs.backToBottomButton.setAttribute(
+    'aria-label',
+    state.responsePhase === 'idle' ? '回到底部' : '有新回复，回到底部',
+  );
+  refs.backToBottomButton.title =
     state.responsePhase === 'idle' ? '回到底部' : '有新回复，回到底部';
   setHidden(refs.backToBottomButton, state.messageFollowMode !== 'history' || state.messages.length === 0);
 

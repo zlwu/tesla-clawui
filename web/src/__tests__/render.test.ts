@@ -209,8 +209,12 @@ describe('renderApp', () => {
 
     renderApp(root, state);
 
-    expect(root.querySelector('#back-to-bottom-button')).not.toBeNull();
-    expect(root.textContent).toContain('回到底部');
+    const backToBottomButton = root.querySelector<HTMLButtonElement>('#back-to-bottom-button');
+
+    expect(backToBottomButton).not.toBeNull();
+    expect(backToBottomButton?.getAttribute('aria-label')).toBe('回到底部');
+    expect(backToBottomButton?.textContent?.trim()).toBe('');
+    expect(backToBottomButton?.querySelector('svg')).not.toBeNull();
   });
 
   it('keeps the textarea editable while waiting for or streaming a reply', () => {
