@@ -19,6 +19,7 @@ type DomRefs = {
   chatShell: HTMLElement;
   statusText: HTMLElement;
   networkText: HTMLElement;
+  themeToggleButton: HTMLButtonElement;
   messages: HTMLElement;
   emptyState: HTMLElement;
   backToBottomButton: HTMLButtonElement;
@@ -50,6 +51,45 @@ const sendIcon = () => `
     />
     <path
       d="M5.9 8.5 10 4.4l4.1 4.1"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="1.7"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+  </svg>
+`;
+
+const autoThemeIcon = () => `
+  <svg viewBox="0 0 20 20" aria-hidden="true" class="button-icon">
+    <path d="M10 4.5 A5.5 5.5 0 0 0 10 15.5 Z" fill="currentColor"/>
+    <circle cx="10" cy="10" r="5.5" fill="none" stroke="currentColor" stroke-width="1.7"/>
+  </svg>
+`;
+
+const sunIcon = () => `
+  <svg viewBox="0 0 20 20" aria-hidden="true" class="button-icon">
+    <circle
+      cx="10" cy="10" r="3"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="1.7"
+      stroke-linecap="round"
+    />
+    <path
+      d="M10 4.5V3.5M10 16.5V15.5M4.5 10H3.5M16.5 10H15.5M6.04 6.04L5.33 5.33M14.67 14.67L13.96 13.96M13.96 6.04L14.67 5.33M5.33 14.67L6.04 13.96"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="1.7"
+      stroke-linecap="round"
+    />
+  </svg>
+`;
+
+const moonIcon = () => `
+  <svg viewBox="0 0 20 20" aria-hidden="true" class="button-icon">
+    <path
+      d="M12.3 6.2 A5 5 0 1 0 12.3 13.8 A4 4 0 0 1 12.3 6.2Z"
       fill="none"
       stroke="currentColor"
       stroke-width="1.7"
@@ -204,7 +244,10 @@ const createChatShell = () => {
   const statusBar = createElement('div', { className: 'status-bar' });
   const statusText = createElement('div', { className: 'status-pill' });
   const networkText = createElement('div', { className: 'status-pill' });
-  statusBar.append(statusText, networkText);
+  const themeToggleButton = createElement('button', { className: 'icon-button theme-toggle-button' });
+  themeToggleButton.id = 'theme-toggle-button';
+  themeToggleButton.type = 'button';
+  statusBar.append(statusText, networkText, themeToggleButton);
   header.append(title, statusBar);
 
   const messages = createElement('section', { className: 'messages' });
@@ -247,6 +290,7 @@ const createChatShell = () => {
     chatShell,
     statusText,
     networkText,
+    themeToggleButton,
     messages,
     emptyState,
     backToBottomButton,
@@ -329,6 +373,16 @@ const syncChatState = (refs: DomRefs, state: AppState): void => {
 
   refs.statusText.textContent = `状态：${statusLabelMap[state.status]}`;
   refs.networkText.textContent = state.networkOnline ? '网络在线' : '网络离线';
+
+  const themeLabelMap = { auto: '跟随系统', light: '白天模式', dark: '夜晚模式' } as const;
+  const themeLabel = themeLabelMap[state.theme];
+  if (refs.themeToggleButton.dataset.theme !== state.theme) {
+    const themeIconMap = { auto: autoThemeIcon, light: sunIcon, dark: moonIcon } as const;
+    refs.themeToggleButton.innerHTML = themeIconMap[state.theme]();
+    refs.themeToggleButton.dataset.theme = state.theme;
+  }
+  refs.themeToggleButton.setAttribute('aria-label', themeLabel);
+  refs.themeToggleButton.title = themeLabel;
 
   refs.textarea.placeholder = inputHintText();
   refs.textarea.disabled = false;

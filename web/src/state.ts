@@ -16,7 +16,10 @@ export type ComposerStatusKind =
   | 'history'
   | 'error';
 
+export type Theme = 'auto' | 'light' | 'dark';
+
 export type AppState = {
+  theme: Theme;
   authEnabled: boolean;
   authRequired: boolean;
   authToken: string | null;
@@ -42,7 +45,16 @@ export type AppState = {
   waitingIndicatorFrame: number;
 };
 
+const readInitialTheme = (): Theme => {
+  try {
+    const s = localStorage.getItem('theme');
+    if (s === 'light' || s === 'dark') return s;
+  } catch { /* localStorage unavailable */ }
+  return 'auto';
+};
+
 export const createInitialState = (): AppState => ({
+  theme: readInitialTheme(),
   authEnabled: false,
   authRequired: false,
   authToken: null,

@@ -36,12 +36,38 @@ export class TeslaOpenClawApp {
   private keyboardSettleTimerId: number | null = null;
   private waitingIndicatorTimerId: number | null = null;
   private baselineLayoutViewportHeight: number | null = null;
+  private systemThemeMql: MediaQueryList | null = null;
+  private systemThemeListener: ((e: MediaQueryListEvent) => void) | null = null;
 
   public constructor(private readonly root: HTMLElement) {}
+
+  private bindSystemThemeListener(): void {
+    this.unbindSystemThemeListener();
+    const mql = window.matchMedia('(prefers-color-scheme: light)');
+    const listener = (e: MediaQueryListEvent) => {
+      if (this.state.theme !== 'auto') return;
+      document.documentElement.dataset.theme = e.matches ? 'light' : 'dark';
+      this.render();
+    };
+    mql.addEventListener('change', listener);
+    this.systemThemeMql = mql;
+    this.systemThemeListener = listener;
+  }
+
+  private unbindSystemThemeListener(): void {
+    if (this.systemThemeMql && this.systemThemeListener) {
+      this.systemThemeMql.removeEventListener('change', this.systemThemeListener);
+    }
+    this.systemThemeMql = null;
+    this.systemThemeListener = null;
+  }
 
   public async start(): Promise<void> {
     this.state.networkOnline = this.readNetworkOnline();
     this.bindEvents();
+    if (this.state.theme === 'auto') {
+      this.bindSystemThemeListener();
+    }
     this.syncViewportLayout();
     this.render();
     await this.bootstrapApp();
@@ -86,6 +112,11 @@ export class TeslaOpenClawApp {
 
       if (button.id === 'back-to-bottom-button') {
         this.handleBackToBottom();
+        return;
+      }
+
+      if (button.id === 'theme-toggle-button') {
+        this.toggleTheme();
         return;
       }
 
@@ -397,6 +428,23 @@ export class TeslaOpenClawApp {
   private scrollComposerIntoView(): void {
     const composer = this.root.querySelector<HTMLElement>('.composer');
     composer?.scrollIntoView({ block: 'end' });
+  }
+
+  private toggleTheme(): void {
+    const cycleMap: Record<string, 'auto' | 'light' | 'dark'> = { auto: 'light', light: 'dark', dark: 'auto' };
+    const next = cycleMap[this.state.theme] ?? 'auto';
+    this.state.theme = next;
+    if (next === 'auto') {
+      try { localStorage.removeItem('theme'); } catch { /* ignore */ }
+      const systemTheme = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+      document.documentElement.dataset.theme = systemTheme;
+      this.bindSystemThemeListener();
+    } else {
+      document.documentElement.dataset.theme = next;
+      try { localStorage.setItem('theme', next); } catch { /* ignore */ }
+      this.unbindSystemThemeListener();
+    }
+    this.render();
   }
 
   private handleBackToBottom(): void {
