@@ -18,7 +18,6 @@ type DomRefs = {
   authError: HTMLElement;
   chatShell: HTMLElement;
   statusText: HTMLElement;
-  sessionText: HTMLElement;
   networkText: HTMLElement;
   messages: HTMLElement;
   emptyState: HTMLElement;
@@ -123,13 +122,9 @@ const createMessageElement = (message: Message, state: AppState): MessageRefs =>
     textContent: message.role === 'assistant' ? 'OC' : '你',
   });
   const body = createElement('div', { className: 'message-body' });
-  const role = createElement('div', {
-    className: 'message-role',
-    textContent: message.role === 'assistant' ? 'OpenClaw' : '你',
-  });
   const content = createElement('div', { className: 'message-content' });
 
-  body.append(role, content);
+  body.append(content);
   shell.append(avatar, body);
   article.append(shell);
 
@@ -159,7 +154,7 @@ const patchMessageElement = (refs: MessageRefs, message: Message, state: AppStat
 const createAuthShell = () => {
   const authShell = createElement('main', { className: 'shell shell-auth' });
   const authCard = createElement('section', { className: 'auth-card' });
-  const title = createElement('div', { className: 'app-title', textContent: 'OpenClaw' });
+  const title = createElement('h1', { className: 'app-title', textContent: 'OpenClaw' });
   const copy = createElement('p', {
     className: 'auth-copy',
     textContent: '输入 6 位 PIN 码后继续使用当前 Tesla 会话。',
@@ -205,12 +200,11 @@ const createAuthShell = () => {
 const createChatShell = () => {
   const chatShell = createElement('main', { className: 'shell' });
   const header = createElement('header', { className: 'app-header' });
-  const title = createElement('div', { className: 'app-title', textContent: 'OpenClaw' });
+  const title = createElement('h1', { className: 'app-title', textContent: 'OpenClaw' });
   const statusBar = createElement('div', { className: 'status-bar' });
   const statusText = createElement('div', { className: 'status-pill' });
-  const sessionText = createElement('div', { className: 'status-pill' });
   const networkText = createElement('div', { className: 'status-pill' });
-  statusBar.append(statusText, sessionText, networkText);
+  statusBar.append(statusText, networkText);
   header.append(title, statusBar);
 
   const messages = createElement('section', { className: 'messages' });
@@ -252,7 +246,6 @@ const createChatShell = () => {
   return {
     chatShell,
     statusText,
-    sessionText,
     networkText,
     messages,
     emptyState,
@@ -335,7 +328,6 @@ const syncChatState = (refs: DomRefs, state: AppState): void => {
   const composerStatus = getComposerStatusView(state);
 
   refs.statusText.textContent = `状态：${statusLabelMap[state.status]}`;
-  refs.sessionText.textContent = state.sessionId ? '会话已连接' : '正在初始化';
   refs.networkText.textContent = state.networkOnline ? '网络在线' : '网络离线';
 
   refs.textarea.placeholder = inputHintText();
@@ -360,7 +352,9 @@ const syncChatState = (refs: DomRefs, state: AppState): void => {
   );
   refs.backToBottomButton.title =
     state.responsePhase === 'idle' ? '回到底部' : '有新回复，回到底部';
-  setHidden(refs.backToBottomButton, state.messageFollowMode !== 'history' || state.messages.length === 0);
+  const followHidden = state.messageFollowMode !== 'history' || state.messages.length === 0;
+  refs.backToBottomButton.classList.toggle('follow-button-hidden', followHidden);
+  refs.backToBottomButton.setAttribute('aria-hidden', String(followHidden));
 
   const showRecoverButton = state.status === 'error';
   setHidden(refs.recoverButton, !showRecoverButton);
