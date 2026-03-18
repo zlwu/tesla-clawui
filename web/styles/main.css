@@ -169,21 +169,48 @@ body {
   letter-spacing: -0.03em;
 }
 
+.app-title-wrap {
+  min-width: 0;
+}
+
 .status-bar {
   display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
+  gap: 10px;
   justify-content: flex-end;
   align-items: center;
 }
 
-.status-pill {
-  padding: 6px 10px;
-  border-radius: 999px;
-  border: 1px solid var(--border-2);
-  background: var(--surface);
+.status-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   color: var(--text-2);
-  font-size: 14px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--text-3);
+  box-shadow: 0 0 0 4px transparent;
+}
+
+.status-indicator-online .status-dot {
+  background: #57c083;
+  box-shadow: 0 0 0 4px rgba(87, 192, 131, 0.14);
+}
+
+.status-indicator-busy .status-dot {
+  background: #f0b84a;
+  box-shadow: 0 0 0 4px rgba(240, 184, 74, 0.14);
+}
+
+.status-indicator-error .status-dot,
+.status-indicator-offline .status-dot {
+  background: var(--error);
+  box-shadow: 0 0 0 4px rgba(224, 85, 85, 0.16);
 }
 
 .messages {
@@ -406,6 +433,7 @@ body {
   display: grid;
   place-items: center;
   padding: 0;
+  cursor: pointer;
 }
 
 .send-icon-button {
@@ -526,19 +554,86 @@ body {
 }
 
 .theme-toggle-button {
-  width: 36px;
-  min-width: 36px;
-  height: 36px;
-  background: transparent;
+  width: 40px;
+  min-width: 40px;
+  height: 40px;
+  background: var(--surface);
   color: var(--text-2);
   border: 1px solid var(--border-2);
-  transition: color 120ms ease, border-color 120ms ease;
-  cursor: pointer;
+  transition: color 120ms ease, border-color 120ms ease, background 120ms ease;
 }
 
-.theme-toggle-button:hover {
+.theme-toggle-button:hover,
+.header-menu-button:hover {
   color: var(--text);
   border-color: var(--border);
+}
+
+.header-menu-wrap {
+  position: relative;
+}
+
+.header-menu-button {
+  width: 22px;
+  min-width: 22px;
+  height: 22px;
+  background: transparent;
+  color: var(--text-2);
+  border: 0;
+  box-shadow: none;
+  transition: color 120ms ease;
+}
+
+.header-menu-button .button-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.header-menu {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 3;
+  min-width: 192px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--surface);
+  box-shadow: 0 18px 32px var(--shadow);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-6px);
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+
+.header-menu-open {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.header-menu-item {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 8px;
+  border-radius: 0;
+  border: 0;
+  box-shadow: none;
+  background: transparent;
+  color: #d25555;
+  text-align: left;
+  font-size: 15px;
+}
+
+.header-menu-item:disabled {
+  opacity: 0.45;
+}
+
+.header-menu-error {
+  min-width: 0;
+  padding: 4px 8px 2px;
+  text-align: left;
+  font-size: 13px;
 }
 
 #app.keyboard-active .app-header {
@@ -554,8 +649,13 @@ body {
     flex-direction: column;
   }
 
+  .app-title-wrap {
+    min-width: 0;
+  }
+
   .status-bar {
     justify-content: flex-start;
+    gap: 8px;
   }
 
   .composer-row {
@@ -578,5 +678,10 @@ body {
     width: 52px;
     min-width: 52px;
     height: 52px;
+  }
+
+  .header-menu {
+    left: 0;
+    right: auto;
   }
 }

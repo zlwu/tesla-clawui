@@ -8,6 +8,7 @@ export type LlmGenerateInput = {
   requestId: string;
   text: string;
   history: LlmHistoryMessage[];
+  upstreamSessionKey?: string;
 };
 
 export type LlmStreamCallbacks = {
@@ -31,4 +32,5 @@ export type LlmStreamResult = {
 export type LlmProvider = {
   generateReply(input: LlmGenerateInput): Promise<string>;
   generateReplyStream(input: LlmGenerateInput, callbacks: LlmStreamCallbacks): Promise<LlmStreamResult>;
+  resetSession(input: { sessionId: string; upstreamSessionKey?: string }): Promise<void>;
 };

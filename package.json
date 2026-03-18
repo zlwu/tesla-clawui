@@ -13,6 +13,8 @@
     "dev:server": "npm run dev -w @tesla-openclaw/server",
     "dev:web": "npm run dev -w @tesla-openclaw/web",
     "lint": "npm run lint -w @tesla-openclaw/shared && npm run lint -w @tesla-openclaw/server && npm run lint -w @tesla-openclaw/web",
+    "smoke:clear-context": "node scripts/verify-clear-context-openclaw.mjs",
+    "smoke:openclaw:gateway": "node scripts/probe-openclaw-gateway.mjs",
     "smoke:openclaw": "node scripts/smoke-openclaw.mjs",
     "start": "npm run start -w @tesla-openclaw/server",
     "test": "npm run build -w @tesla-openclaw/shared && npm run test -w @tesla-openclaw/shared && npm run test -w @tesla-openclaw/server && npm run test -w @tesla-openclaw/web",

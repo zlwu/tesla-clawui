@@ -103,4 +103,6 @@ export class OpenAiCompatibleProvider implements LlmProvider {
       emptyMessage: 'LLM 返回为空',
     });
   }
+
+  public async resetSession(): Promise<void> {}
 }

@@ -68,6 +68,10 @@ export class MessageService {
     return message;
   }
 
+  public async clearSession(sessionId: string): Promise<void> {
+    await this.db.delete(messages).where(eq(messages.sessionId, sessionId));
+  }
+
   private createMonotonicTimestamp(): string {
     const nowMs = Date.now();
     this.lastCreatedAtMs = Math.max(nowMs, this.lastCreatedAtMs + 1);

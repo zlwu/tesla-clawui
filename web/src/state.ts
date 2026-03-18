@@ -43,6 +43,9 @@ export type AppState = {
   restoreFollowOnBlur: boolean;
   pendingAssistantMessageId: string | null;
   waitingIndicatorFrame: number;
+  isHeaderMenuOpen: boolean;
+  isClearingContext: boolean;
+  clearContextError: string | null;
 };
 
 const readInitialTheme = (): Theme => {
@@ -78,4 +81,7 @@ export const createInitialState = (): AppState => ({
   restoreFollowOnBlur: true,
   pendingAssistantMessageId: null,
   waitingIndicatorFrame: 0,
+  isHeaderMenuOpen: false,
+  isClearingContext: false,
+  clearContextError: null,
 });

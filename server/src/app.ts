@@ -26,6 +26,8 @@ declare module 'fastify' {
       authService: AuthService;
       sessionService: SessionService;
       messageService: MessageService;
+      requestLogService: RequestLogService;
+      llmService: LlmService;
       textService: TextService;
     };
   }
@@ -46,7 +48,7 @@ export const createApp = () => {
   const sessionService = new SessionService(db, config);
   const messageService = new MessageService(db);
   const requestLogService = new RequestLogService(db);
-  const llmService = new LlmService(config);
+  const llmService = new LlmService(config, db);
   const textService = new TextService(
     sessionService,
     messageService,
@@ -59,6 +61,8 @@ export const createApp = () => {
     authService,
     sessionService,
     messageService,
+    requestLogService,
+    llmService,
     textService,
   });
 

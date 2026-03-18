@@ -5,6 +5,8 @@ import type {
   appErrorCodeSchema,
   appStatusSchema,
   authConfigResponseSchema,
+  clearSessionContextRequestSchema,
+  clearSessionContextResponseSchema,
   createSessionRequestSchema,
   createSessionResponseSchema,
   healthResponseSchema,
@@ -29,6 +31,8 @@ export type Message = z.infer<typeof messageSchema>;
 export type AppError = z.infer<typeof appErrorSchema>;
 export type CreateSessionRequest = z.infer<typeof createSessionRequestSchema>;
 export type CreateSessionResponse = z.infer<typeof createSessionResponseSchema>;
+export type ClearSessionContextRequest = z.infer<typeof clearSessionContextRequestSchema>;
+export type ClearSessionContextResponse = z.infer<typeof clearSessionContextResponseSchema>;
 export type AuthConfigResponse = z.infer<typeof authConfigResponseSchema>;
 export type UnlockRequest = z.infer<typeof unlockRequestSchema>;
 export type UnlockResponse = z.infer<typeof unlockResponseSchema>;

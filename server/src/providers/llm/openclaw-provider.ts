@@ -1,16 +1,18 @@
 import { AppException } from '../../lib/errors.js';
 import type { AppConfig } from '../../lib/config.js';
-import { readOpenAiCompatibleStream } from './openai-stream.js';
 import type { LlmGenerateInput, LlmProvider, LlmStreamCallbacks, LlmStreamResult } from './provider.js';
-
-const systemPrompt = '你是 Tesla 车机里的 OpenClaw 助手。回答简洁、清晰、适合大字文本显示。';
-
-type OpenAiCompatibleResponse = {
-  choices?: Array<{ message?: { content?: string } }>;
-};
+import type { OpenClawGatewayAuthStore } from './openclaw-gateway-auth-store.js';
+import { OpenClawGatewayClient } from './openclaw-gateway-client.js';
 
 export class OpenClawProvider implements LlmProvider {
-  public constructor(private readonly config: AppConfig) {}
+  private readonly client: OpenClawGatewayClient;
+
+  public constructor(
+    private readonly config: AppConfig,
+    authStore: OpenClawGatewayAuthStore,
+  ) {
+    this.client = new OpenClawGatewayClient(config, authStore);
+  }
 
   public async generateReply(input: LlmGenerateInput): Promise<string> {
     if (!this.config.llmBaseUrl || !this.config.llmApiKey) {
@@ -21,47 +23,16 @@ export class OpenClawProvider implements LlmProvider {
       });
     }
 
-    const headers: HeadersInit = {
-      Authorization: `Bearer ${this.config.llmApiKey}`,
-      'Content-Type': 'application/json',
-    };
-    const model = this.resolveModel();
-
-    const response = await fetch(this.config.llmBaseUrl, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        model,
-        user: input.sessionId,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          ...input.history,
-          { role: 'user', content: input.text },
-        ],
-      }),
+    const result = await this.client.sendChat({
+      requestId: input.requestId,
+      sessionKey: this.requireUpstreamSessionKey(input),
+      text: input.text,
+      callbacks: {
+        onDelta: () => {},
+      },
     });
 
-    if (!response.ok) {
-      throw new AppException(502, {
-        code: 'LLM_FAILED',
-        message: 'OpenClaw 服务调用失败',
-        retryable: true,
-        details: { status: response.status },
-      });
-    }
-
-    const payload = (await response.json()) as OpenAiCompatibleResponse;
-    const content = payload.choices?.[0]?.message?.content?.trim();
-
-    if (!content) {
-      throw new AppException(502, {
-        code: 'LLM_FAILED',
-        message: 'OpenClaw 返回为空',
-        retryable: true,
-      });
-    }
-
-    return content;
+    return result.replyText;
   }
 
   public async generateReplyStream(
@@ -76,50 +47,32 @@ export class OpenClawProvider implements LlmProvider {
       });
     }
 
-    const response = await fetch(this.config.llmBaseUrl, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${this.config.llmApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: this.resolveModel(),
-        user: input.sessionId,
-        stream: true,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          ...input.history,
-          { role: 'user', content: input.text },
-        ],
-      }),
-    });
-
-    if (!response.ok) {
-      throw new AppException(502, {
-        code: 'LLM_FAILED',
-        message: 'OpenClaw 服务调用失败',
-        retryable: true,
-        details: { status: response.status },
-      });
-    }
-
-    return readOpenAiCompatibleStream({
-      provider: 'openclaw',
-      response,
-      onDelta: (delta) => callbacks.onDelta(delta),
-      emptyMessage: 'OpenClaw 返回为空',
+    return this.client.sendChat({
+      requestId: input.requestId,
+      sessionKey: this.requireUpstreamSessionKey(input),
+      text: input.text,
+      callbacks,
     });
   }
 
-  private resolveModel(): string {
-    if (!this.config.openclawAgentId) {
-      return this.config.llmModel;
+  public async resetSession(input: {
+    sessionId: string;
+    upstreamSessionKey?: string;
+  }): Promise<void> {
+    const sessionKey = input.upstreamSessionKey ?? this.client.resolveSessionKey(input.sessionId);
+    await this.client.resetSession(sessionKey);
+  }
+
+  private requireUpstreamSessionKey(input: LlmGenerateInput): string {
+    if (!input.upstreamSessionKey) {
+      throw new AppException(500, {
+        code: 'LLM_FAILED',
+        message: '缺少 OpenClaw 上游会话映射',
+        retryable: false,
+        details: { sessionId: input.sessionId },
+      });
     }
 
-    if (this.config.llmModel.includes(':')) {
-      return this.config.llmModel;
-    }
-
-    return `${this.config.llmModel}:${this.config.openclawAgentId}`;
+    return input.upstreamSessionKey;
   }
 }

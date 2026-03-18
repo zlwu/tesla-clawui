@@ -1,6 +1,7 @@
 import type { AppError, AppErrorCode, Message } from '@tesla-openclaw/shared';
 
 import {
+  clearSessionContext,
   createSession,
   fetchAuthConfig,
   fetchMessages,
@@ -101,22 +102,36 @@ export class TeslaOpenClawApp {
       }
 
       if (button.id === 'send-button') {
+        this.closeHeaderMenu();
         void this.handleSend();
         return;
       }
 
       if (button.id === 'recover-button') {
+        this.closeHeaderMenu();
         void this.handleRecoveryAction();
         return;
       }
 
       if (button.id === 'back-to-bottom-button') {
+        this.closeHeaderMenu();
         this.handleBackToBottom();
         return;
       }
 
       if (button.id === 'theme-toggle-button') {
+        this.closeHeaderMenu();
         this.toggleTheme();
+        return;
+      }
+
+      if (button.id === 'header-menu-button') {
+        this.toggleHeaderMenu();
+        return;
+      }
+
+      if (button.id === 'clear-context-button') {
+        void this.handleClearContext();
         return;
       }
 
@@ -126,6 +141,15 @@ export class TeslaOpenClawApp {
     };
 
     this.root.addEventListener('pointerdown', (event) => {
+      const target = event.target;
+      if (
+        this.state.isHeaderMenuOpen &&
+        target instanceof Element &&
+        !target.closest('.header-menu-wrap')
+      ) {
+        this.closeHeaderMenu();
+        this.render();
+      }
       handleButtonAction(event, { early: true });
     });
 
@@ -447,6 +471,23 @@ export class TeslaOpenClawApp {
     this.render();
   }
 
+  private toggleHeaderMenu(): void {
+    this.state.isHeaderMenuOpen = !this.state.isHeaderMenuOpen;
+    if (!this.state.isHeaderMenuOpen) {
+      this.state.clearContextError = null;
+    }
+    this.render();
+  }
+
+  private closeHeaderMenu(): void {
+    if (!this.state.isHeaderMenuOpen && !this.state.clearContextError) {
+      return;
+    }
+
+    this.state.isHeaderMenuOpen = false;
+    this.state.clearContextError = null;
+  }
+
   private handleBackToBottom(): void {
     this.state.messageFollowMode = 'follow';
     this.render();
@@ -631,6 +672,9 @@ export class TeslaOpenClawApp {
     this.state.keyboardAvoidanceSource = 'none';
     this.state.restoreFollowOnBlur = true;
     this.state.pendingAssistantMessageId = null;
+    this.state.isHeaderMenuOpen = false;
+    this.state.isClearingContext = false;
+    this.state.clearContextError = null;
     this.stopWaitingIndicator();
     this.pendingInitialScroll = true;
     clearPersistedState();
@@ -666,6 +710,9 @@ export class TeslaOpenClawApp {
     this.state.errorCode = null;
     this.state.responsePhase = 'idle';
     this.state.pendingAssistantMessageId = null;
+    this.state.isHeaderMenuOpen = false;
+    this.state.isClearingContext = false;
+    this.state.clearContextError = null;
     this.stopWaitingIndicator();
     this.persistState();
     this.render();
@@ -702,6 +749,9 @@ export class TeslaOpenClawApp {
     this.state.retryAction = null;
     this.state.responsePhase = 'idle';
     this.state.pendingAssistantMessageId = null;
+    this.state.isHeaderMenuOpen = false;
+    this.state.isClearingContext = false;
+    this.state.clearContextError = null;
     this.stopWaitingIndicator();
     this.persistState();
     this.render();
@@ -726,6 +776,9 @@ export class TeslaOpenClawApp {
     this.state.retryAction = null;
     this.state.responsePhase = 'idle';
     this.state.pendingAssistantMessageId = null;
+    this.state.isHeaderMenuOpen = false;
+    this.state.isClearingContext = false;
+    this.state.clearContextError = null;
     this.stopWaitingIndicator();
     this.pendingInitialScroll = true;
     this.state.messageFollowMode = 'follow';
@@ -737,6 +790,8 @@ export class TeslaOpenClawApp {
     if (!this.state.sessionId || !this.state.sessionToken) {
       return;
     }
+
+    this.closeHeaderMenu();
 
     const text = this.state.draftText.trim();
     if (!text) {
@@ -820,6 +875,7 @@ export class TeslaOpenClawApp {
   }
 
   private async handleRecoveryAction(): Promise<void> {
+    this.closeHeaderMenu();
     const retryAction = this.state.retryAction;
     this.state.error = null;
     this.state.errorCode = null;
@@ -850,6 +906,8 @@ export class TeslaOpenClawApp {
     if (!this.state.sessionId || !this.state.sessionToken) {
       return;
     }
+
+    this.closeHeaderMenu();
 
     const optimisticUserMessage = this.createOptimisticMessage({
       messageId: `local_user_${action.requestId}`,
@@ -975,5 +1033,60 @@ export class TeslaOpenClawApp {
 
     this.state.messages = limitMessages(messages);
     this.state.messageFollowMode = 'follow';
+  }
+
+  private async handleClearContext(): Promise<void> {
+    if (!this.state.sessionId || !this.state.sessionToken) {
+      return;
+    }
+
+    const previousSessionId = this.state.sessionId;
+    const previousSessionToken = this.state.sessionToken;
+
+    if (this.state.responsePhase !== 'idle') {
+      this.state.clearContextError = '请等待当前回复结束后再清除上下文';
+      this.render();
+      return;
+    }
+
+    this.state.isHeaderMenuOpen = true;
+    this.state.isClearingContext = true;
+    this.state.clearContextError = null;
+    this.render();
+
+    const result = await clearSessionContext(
+      previousSessionId,
+      previousSessionToken,
+      this.state.authToken,
+    );
+
+    if (!result.ok) {
+      this.state.isClearingContext = false;
+      if (result.error.code === 'AUTH_REQUIRED') {
+        this.applyApiFailure(result, null);
+        this.render();
+        return;
+      }
+      this.state.clearContextError = toDisplayErrorMessage(result.error, this.readNetworkOnline());
+      this.render();
+      return;
+    }
+
+    this.state.messages = [];
+    this.state.status = 'idle';
+    this.state.error = null;
+    this.state.errorCode = null;
+    this.state.retryAction = null;
+    this.state.responsePhase = 'idle';
+    this.state.pendingAssistantMessageId = null;
+    this.state.messageFollowMode = 'follow';
+    this.state.isSendingText = false;
+    this.state.isClearingContext = false;
+    this.stopWaitingIndicator();
+    this.pendingInitialScroll = true;
+    this.state.isHeaderMenuOpen = false;
+    this.state.clearContextError = null;
+    this.persistState();
+    this.render();
   }
 }

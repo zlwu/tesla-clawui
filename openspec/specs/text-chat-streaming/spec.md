@@ -16,7 +16,7 @@ Tesla 客户端 MUST 通过专用文本输入 API 发送消息，并校验 `sess
 - **THEN** 后端 MUST 按统一错误响应结构拒绝该请求
 
 ### Requirement: SSE 流式回复路径
-助手回复 MUST 支持 server-sent event streaming，并作为当前主回复路径。只有在上游 provider 流明确完成且服务端已经形成可信的最终回复后，服务端才 MUST 发送终止性的 `done` 事件。
+助手回复 MUST 支持 server-sent event streaming，并作为当前主回复路径。只有在上游 provider 流明确完成且服务端已经形成可信的最终回复后，服务端才 MUST 发送终止性的 `done` 事件。对于 `LLM_PROVIDER=openclaw`，服务端 MUST 将 OpenClaw Gateway 原生 chat/session 流式事件桥接为现有的 `start` / `delta` / `done` SSE 语义，而前端接口形式保持不变。
 
 #### Scenario: 开始流式回复
 - **WHEN** 客户端针对合法请求打开流式文本接口
@@ -59,3 +59,28 @@ Tesla 客户端 MUST 通过专用文本输入 API 发送消息，并校验 `sess
 #### Scenario: 流式回复异常结束
 - **WHEN** 一次上游流因解析异常、显式上游错误或静默截断而失败
 - **THEN** 服务端 MUST 记录与该 `requestId` 对应的异常终止原因和完成性诊断信息，以支持后端排障
+
+### Requirement: 清除上下文后的文本请求从空历史开始
+文本输入主链路 MUST 在清除上下文成功后，把同一 session 的后续文本请求视为从空历史开始的新对话。
+
+#### Scenario: 清除后发送第一条消息
+- **WHEN** 用户在清除上下文成功后发送第一条新消息
+- **THEN** 服务端 MUST 在不带任何已清除历史消息的前提下处理该请求
+
+### Requirement: 流式期间禁止并发清除
+系统 MUST 避免在同一 session 的文本流式请求尚未完成时并发执行清除上下文，以防止进行中的 SSE 回复与消息持久化状态失配。
+
+#### Scenario: 流式请求进行时尝试清除
+- **WHEN** 同一 session 仍有 waiting 或 streaming 中的文本请求
+- **THEN** 系统 MUST 拒绝该次清除上下文请求，并返回稳定、可机读的失败结果
+
+### Requirement: OpenClaw 原生事件桥接
+当使用 OpenClaw Gateway 原生 chat/session API 时，服务端 MUST 把原生事件流稳定映射到现有 Tesla 前端可消费的 SSE 语义，并保留错误与完成性诊断能力。
+
+#### Scenario: 原生 Gateway 事件映射为 SSE
+- **WHEN** OpenClaw Gateway 原生 chat/session 返回一组有序事件
+- **THEN** 服务端 MUST 仅向前端暴露兼容当前 UI 的 `start`、`delta`、`done` 或 `error` 事件集合
+
+#### Scenario: 原生 Gateway 流异常结束
+- **WHEN** OpenClaw Gateway 原生 chat/session 在缺少可信完成信号的情况下结束
+- **THEN** 服务端 MUST 将该次回复视为失败，并返回与当前 SSE 主链路一致的错误语义

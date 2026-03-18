@@ -55,7 +55,7 @@
 - `AUTH_SESSION_DAYS=90`
 - `AUTH_TOKEN_SECRET=<高强度随机值>`
 - `LLM_PROVIDER=openclaw`
-- `LLM_BASE_URL=<OpenClaw Gateway 地址>`
+- `LLM_BASE_URL=<OpenClaw Gateway WebSocket 地址>`
 - `LLM_API_KEY=<Gateway token>`
 - `LLM_MODEL=openclaw`
 - `OPENCLAW_AGENT_ID=main`
@@ -72,12 +72,12 @@
 
 - 不要优先暴露 OpenClaw 到公网
 - 优先使用容器内可达的宿主机地址
-- 应用只需要能访问 `/v1/chat/completions`
+- 应用只需要能访问 Gateway WebSocket 根地址
 
 例如：
 
-- `LLM_BASE_URL=http://openclaw:18789/v1/chat/completions`
-- 或 `LLM_BASE_URL=http://172.17.0.1:18789/v1/chat/completions`
+- `LLM_BASE_URL=ws://openclaw:18789`
+- 或 `LLM_BASE_URL=ws://172.17.0.1:18789`
 
 实际取决于 Coolify 中 OpenClaw 的部署方式。
 

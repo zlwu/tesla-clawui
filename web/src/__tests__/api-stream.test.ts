@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { sendTextMessageStream } from '../api.js';
+import { clearSessionContext, sendTextMessageStream } from '../api.js';
 
 describe('sendTextMessageStream', () => {
   beforeEach(() => {
@@ -49,17 +49,15 @@ describe('sendTextMessageStream', () => {
       },
     });
 
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue(
-        new Response(stream, {
-          status: 200,
-          headers: {
-            'content-type': 'text/event-stream; charset=utf-8',
-          },
-        }),
-      ),
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(stream, {
+        status: 200,
+        headers: {
+          'content-type': 'text/event-stream; charset=utf-8',
+        },
+      }),
     );
+    vi.stubGlobal('fetch', fetchMock);
 
     const deltas: string[] = [];
     const started: string[] = [];
@@ -77,6 +75,8 @@ describe('sendTextMessageStream', () => {
     });
 
     expect(result.ok).toBe(true);
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(init.body).not.toContain('openclawSessionKey');
     expect(started).toHaveLength(1);
     expect(deltas).toEqual(['你好', '，世界']);
     if (result.ok) {
@@ -102,17 +102,15 @@ describe('sendTextMessageStream', () => {
       },
     });
 
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue(
-        new Response(stream, {
-          status: 200,
-          headers: {
-            'content-type': 'text/event-stream; charset=utf-8',
-          },
-        }),
-      ),
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(stream, {
+        status: 200,
+        headers: {
+          'content-type': 'text/event-stream; charset=utf-8',
+        },
+      }),
     );
+    vi.stubGlobal('fetch', fetchMock);
 
     const deltas: string[] = [];
     const result = await sendTextMessageStream({
@@ -127,11 +125,45 @@ describe('sendTextMessageStream', () => {
     });
 
     expect(deltas).toEqual(['半句']);
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(init.body).not.toContain('openclawSessionKey');
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.code).toBe('SERVICE_UNAVAILABLE');
       expect(result.error.retryable).toBe(true);
       expect(result.error.message).toBe('流式响应提前结束，请稍后重试');
     }
+  });
+
+  it('posts clear-context requests to the session clear endpoint', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({
+          ok: true,
+          data: {
+            sessionId: 'sess_1',
+            cleared: true,
+          },
+        }), {
+          status: 200,
+          headers: {
+            'content-type': 'application/json',
+          },
+        }),
+      );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await clearSessionContext('sess_1', 'token_1');
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('/api/session/clear');
+    expect(init.method).toBe('POST');
+    expect(init.headers).toEqual(
+      expect.objectContaining({
+        Authorization: 'Bearer token_1',
+        'Content-Type': 'application/json',
+      }),
+    );
+    expect(result.ok).toBe(true);
   });
 });

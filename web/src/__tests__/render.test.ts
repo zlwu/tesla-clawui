@@ -82,7 +82,7 @@ describe('renderApp', () => {
 
     expect(root.querySelector('#recover-button')).not.toBeNull();
     expect(root.textContent).toContain('重试上一步');
-    expect(root.textContent).toContain('网络离线');
+    expect(root.textContent).toContain('离线');
     expect(root.querySelector<HTMLTextAreaElement>('#text-input')?.value).toBe('保留中的文本');
   });
 
@@ -232,5 +232,60 @@ describe('renderApp', () => {
 
     expect(waitingTextarea?.disabled).toBe(false);
     expect(streamingTextarea?.disabled).toBe(false);
+  });
+
+  it('renders a compact header status indicator instead of multiple status pills', () => {
+    const root = document.createElement('div');
+    const state = createInitialState();
+
+    renderApp(root, state);
+
+    const header = root.querySelector('.app-header');
+
+    expect(header?.querySelector('.status-indicator')).not.toBeNull();
+    expect(header?.querySelector('.status-pill')).toBeNull();
+    expect(header?.textContent).toContain('在线');
+  });
+
+  it('renders clear-context inside the overflow menu when messages exist', () => {
+    const root = document.createElement('div');
+    const state = createInitialState();
+    state.isHeaderMenuOpen = true;
+    state.messages = [
+      {
+        messageId: 'msg_1',
+        sessionId: 'sess_1',
+        role: 'assistant',
+        content: '已有历史',
+        source: 'llm',
+        createdAt: new Date().toISOString(),
+      },
+    ];
+
+    renderApp(root, state);
+
+    expect(root.querySelector('#header-menu-button')).not.toBeNull();
+    expect(root.querySelector('#clear-context-button')?.textContent).toBe('清除上下文');
+  });
+
+  it('disables clear-context while a reply is still active', () => {
+    const root = document.createElement('div');
+    const state = createInitialState();
+    state.isHeaderMenuOpen = true;
+    state.responsePhase = 'streaming';
+    state.messages = [
+      {
+        messageId: 'msg_1',
+        sessionId: 'sess_1',
+        role: 'assistant',
+        content: '已有历史',
+        source: 'llm',
+        createdAt: new Date().toISOString(),
+      },
+    ];
+
+    renderApp(root, state);
+
+    expect(root.querySelector<HTMLButtonElement>('#clear-context-button')?.disabled).toBe(true);
   });
 });

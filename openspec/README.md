@@ -15,11 +15,15 @@
 - `shared-pin-auth`
   - 固化共享 PIN 门禁与解锁流程
 - `session-and-message-lifecycle`
-  - 固化会话创建、消息持久化、最近消息恢复和请求幂等
+  - 固化会话创建、消息持久化、上下文清除、最近消息恢复和请求幂等
 - `text-chat-streaming`
-  - 固化文本发送、SSE 流式回复、统一错误结构和流式完成语义
+  - 固化文本发送、SSE 流式回复、清除门禁、统一错误结构和流式完成语义
+- `openclaw-gateway-native-chat`
+  - 固化 OpenClaw Gateway 原生 chat/session 接入与 agent 路由语义
 - `tesla-chat-ui`
-  - 固化 Tesla 输入区、消息区、滚动和受控 Markdown 展示要求
+  - 固化 Tesla 输入区、消息区、顶栏清除入口、滚动和受控 Markdown 展示要求
+- `tesla-main-screen-interactions`
+  - 固化主界面等待反馈、回到底部入口与 composer 就近交互
 
 ## 后续工作方式
 

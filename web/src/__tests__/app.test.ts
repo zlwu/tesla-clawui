@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../api.js', () => ({
+  clearSessionContext: vi.fn(),
   createSession: vi.fn(),
   fetchAuthConfig: vi.fn(),
   fetchMessages: vi.fn(),
@@ -9,7 +10,7 @@ vi.mock('../api.js', () => ({
 }));
 
 import { TeslaOpenClawApp } from '../app.js';
-import { sendTextMessageStream } from '../api.js';
+import { clearSessionContext, createSession, sendTextMessageStream } from '../api.js';
 
 describe('TeslaOpenClawApp keyboard send behavior', () => {
   beforeEach(() => {
@@ -91,5 +92,131 @@ describe('TeslaOpenClawApp keyboard send behavior', () => {
     await Promise.resolve();
 
     expect(sendTextMessageStream).toHaveBeenCalledTimes(1);
+  });
+
+  it('clears conversation context after menu confirm', async () => {
+    vi.mocked(clearSessionContext).mockResolvedValue({
+      ok: true,
+      data: {
+        sessionId: 'sess_1',
+        cleared: true,
+      },
+    });
+
+    const root = document.createElement('div');
+    const app = new TeslaOpenClawApp(root) as unknown as {
+      state: {
+        sessionId: string | null;
+        sessionToken: string | null;
+        messages: Array<{ messageId: string; sessionId: string; role: 'assistant'; content: string; source: 'llm'; createdAt: string }>;
+      };
+      bindEvents(): void;
+      render(): void;
+    };
+
+    app.state.sessionId = 'sess_1';
+    app.state.sessionToken = 'token_1';
+    app.state.messages = [
+      {
+        messageId: 'msg_1',
+        sessionId: 'sess_1',
+        role: 'assistant',
+        content: '旧上下文',
+        source: 'llm',
+        createdAt: new Date().toISOString(),
+      },
+    ];
+    app.bindEvents();
+    app.render();
+
+    root.querySelector<HTMLButtonElement>('#header-menu-button')?.click();
+    root.querySelector<HTMLButtonElement>('#clear-context-button')?.click();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(clearSessionContext).toHaveBeenCalledWith('sess_1', 'token_1', null);
+    expect(createSession).not.toHaveBeenCalled();
+    expect(app.state.messages).toHaveLength(0);
+    expect(app.state.sessionId).toBe('sess_1');
+    expect(app.state.sessionToken).toBe('token_1');
+  });
+
+  it('returns to the PIN gate when clear-context gets AUTH_REQUIRED', async () => {
+    vi.mocked(clearSessionContext).mockResolvedValue({
+      ok: false,
+      error: {
+        code: 'AUTH_REQUIRED',
+        message: '请先输入 PIN 码解锁',
+        retryable: false,
+      },
+    });
+
+    const root = document.createElement('div');
+    const app = new TeslaOpenClawApp(root) as unknown as {
+      state: {
+        authEnabled: boolean;
+        authToken: string | null;
+        authExpiresAt: string | null;
+        authRequired: boolean;
+        sessionId: string | null;
+        sessionToken: string | null;
+        messages: Array<{ messageId: string; sessionId: string; role: 'assistant'; content: string; source: 'llm'; createdAt: string }>;
+      };
+      bindEvents(): void;
+      render(): void;
+    };
+
+    app.state.authEnabled = true;
+    app.state.authToken = 'expired_auth_token';
+    app.state.authExpiresAt = new Date(Date.now() - 60_000).toISOString();
+    app.state.authRequired = false;
+    app.state.sessionId = 'sess_1';
+    app.state.sessionToken = 'token_1';
+    app.state.messages = [
+      {
+        messageId: 'msg_1',
+        sessionId: 'sess_1',
+        role: 'assistant',
+        content: '旧上下文',
+        source: 'llm',
+        createdAt: new Date().toISOString(),
+      },
+    ];
+    app.bindEvents();
+    app.render();
+
+    root.querySelector<HTMLButtonElement>('#header-menu-button')?.click();
+    root.querySelector<HTMLButtonElement>('#clear-context-button')?.click();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(app.state.authRequired).toBe(true);
+    expect(app.state.authToken).toBeNull();
+    expect(app.state.sessionId).toBeNull();
+    expect(root.querySelector('#unlock-button')).not.toBeNull();
+  });
+
+  it('closes the header menu when clicking outside the menu area', () => {
+    const root = document.createElement('div');
+    const app = new TeslaOpenClawApp(root) as unknown as {
+      state: {
+        isHeaderMenuOpen: boolean;
+      };
+      bindEvents(): void;
+      render(): void;
+    };
+
+    app.bindEvents();
+    app.render();
+
+    root.querySelector<HTMLButtonElement>('#header-menu-button')?.dispatchEvent(
+      new Event('pointerdown', { bubbles: true }),
+    );
+
+    expect(app.state.isHeaderMenuOpen).toBe(true);
+
+    root.dispatchEvent(new Event('pointerdown', { bubbles: true }));
+
+    expect(app.state.isHeaderMenuOpen).toBe(false);
   });
 });

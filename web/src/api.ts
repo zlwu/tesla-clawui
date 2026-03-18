@@ -2,6 +2,7 @@ import type {
   AuthConfigResponse,
   ApiFailure,
   ApiResponse,
+  ClearSessionContextResponse,
   CreateSessionResponse,
   MessagesResponse,
   TextInputResponse,
@@ -11,6 +12,7 @@ import {
   apiErrorResponseSchema,
   apiSuccessSchema,
   authConfigResponseSchema,
+  clearSessionContextResponseSchema,
   createSessionResponseSchema,
   messagesResponseSchema,
   textInputResponseSchema,
@@ -21,6 +23,7 @@ import { getWebConfig } from './config.js';
 
 const createSessionEnvelopeSchema = apiSuccessSchema(createSessionResponseSchema);
 const authConfigEnvelopeSchema = apiSuccessSchema(authConfigResponseSchema);
+const clearSessionContextEnvelopeSchema = apiSuccessSchema(clearSessionContextResponseSchema);
 const textInputEnvelopeSchema = apiSuccessSchema(textInputResponseSchema);
 const unlockEnvelopeSchema = apiSuccessSchema(unlockResponseSchema);
 const messagesEnvelopeSchema = apiSuccessSchema(messagesResponseSchema);
@@ -124,6 +127,24 @@ export const fetchMessages = async (
         }, authToken),
       }),
     messagesEnvelopeSchema,
+  );
+
+export const clearSessionContext = async (
+  sessionId: string,
+  sessionToken: string,
+  authToken?: string | null,
+): Promise<ApiResponse<ClearSessionContextResponse>> =>
+  safeRequest(
+    async () =>
+      fetch(toApiUrl('/api/session/clear'), {
+        method: 'POST',
+        headers: withAppAuth({
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${sessionToken}`,
+        }, authToken),
+        body: JSON.stringify({ sessionId }),
+      }),
+    clearSessionContextEnvelopeSchema,
   );
 
 export const sendTextMessage = async (params: {

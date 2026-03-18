@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 
 import type { CreateSessionResponse, Session } from '@tesla-openclaw/shared';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 
 import type { DatabaseClient } from '../db/client.js';
 import { sessions } from '../db/schema.js';
@@ -16,6 +16,25 @@ const toSession = (row: typeof sessions.$inferSelect): Session => ({
   updatedAt: row.updatedAt,
 });
 
+export type AuthorizedSessionState = Session & {
+  openclawSessionKey: string | null;
+};
+
+const resolveOpenClawAgentId = (config: AppConfig): string => {
+  if (config.openclawAgentId) {
+    return config.openclawAgentId;
+  }
+
+  if (config.llmModel.startsWith('openclaw:')) {
+    const [, agentId] = config.llmModel.split(':', 2);
+    if (agentId) {
+      return agentId;
+    }
+  }
+
+  return 'main';
+};
+
 export class SessionService {
   public constructor(
     private readonly db: DatabaseClient,
@@ -26,6 +45,10 @@ export class SessionService {
     const sessionId = createId('sess');
     const sessionToken = randomBytes(this.config.sessionTokenBytes).toString('hex');
     const createdAt = nowIso();
+    const openclawSessionKey =
+      this.config.llmProvider === 'openclaw'
+        ? `agent:${resolveOpenClawAgentId(this.config)}:${sessionId}`
+        : null;
 
     await this.db.insert(sessions).values({
       id: sessionId,
@@ -33,6 +56,7 @@ export class SessionService {
       status: 'idle',
       deviceType: 'tesla-browser',
       deviceLabel,
+      ...(openclawSessionKey ? { openclawSessionKey } : {}),
       createdAt,
       updatedAt: createdAt,
     });
@@ -49,6 +73,61 @@ export class SessionService {
   }
 
   public async getAuthorizedSession(sessionId: string, token: string): Promise<Session> {
+    const row = await this.getAuthorizedSessionRow(sessionId, token);
+
+    return toSession(row);
+  }
+
+  public async getAuthorizedSessionState(sessionId: string, token: string): Promise<AuthorizedSessionState> {
+    const row = await this.getAuthorizedSessionRow(sessionId, token);
+
+    return {
+      ...toSession(row),
+      openclawSessionKey: row.openclawSessionKey,
+    };
+  }
+
+  public async acquireAuthorizedBusySession(
+    sessionId: string,
+    token: string,
+  ): Promise<AuthorizedSessionState> {
+    const row = await this.getAuthorizedSessionRow(sessionId, token);
+    if (row.status !== 'idle') {
+      throw this.createBusySessionConflict();
+    }
+
+    const updatedAt = nowIso();
+    const result = this.db
+      .update(sessions)
+      .set({ status: 'thinking', updatedAt })
+      .where(and(
+        eq(sessions.id, sessionId),
+        eq(sessions.token, token),
+        eq(sessions.status, 'idle'),
+      ))
+      .run();
+
+    if (result.changes === 0) {
+      throw this.createBusySessionConflict();
+    }
+
+    return {
+      sessionId: row.id,
+      status: 'thinking',
+      createdAt: row.createdAt,
+      updatedAt,
+      openclawSessionKey: row.openclawSessionKey,
+    };
+  }
+
+  public async touch(sessionId: string, status: Session['status']): Promise<void> {
+    await this.db
+      .update(sessions)
+      .set({ status, updatedAt: nowIso() })
+      .where(eq(sessions.id, sessionId));
+  }
+
+  private async getAuthorizedSessionRow(sessionId: string, token: string): Promise<typeof sessions.$inferSelect> {
     const row = await this.db.query.sessions.findFirst({
       where: eq(sessions.id, sessionId),
     });
@@ -69,13 +148,14 @@ export class SessionService {
       });
     }
 
-    return toSession(row);
+    return row;
   }
 
-  public async touch(sessionId: string, status: Session['status']): Promise<void> {
-    await this.db
-      .update(sessions)
-      .set({ status, updatedAt: nowIso() })
-      .where(eq(sessions.id, sessionId));
+  private createBusySessionConflict(): AppException {
+    return new AppException(409, {
+      code: 'REQUEST_CONFLICT',
+      message: '当前回复尚未完成，请稍后再试',
+      retryable: true,
+    });
   }
 }

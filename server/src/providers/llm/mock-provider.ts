@@ -36,4 +36,6 @@ export class MockLlmProvider implements LlmProvider {
       },
     };
   }
+
+  public async resetSession(): Promise<void> {}
 }

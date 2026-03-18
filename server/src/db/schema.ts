@@ -7,6 +7,7 @@ export const sessions = sqliteTable('sessions', {
   status: text('status').notNull(),
   deviceType: text('device_type').notNull(),
   deviceLabel: text('device_label'),
+  openclawSessionKey: text('openclaw_session_key'),
   createdAt: text('created_at').notNull().default(sql`CURRENT_TIMESTAMP`),
   updatedAt: text('updated_at').notNull().default(sql`CURRENT_TIMESTAMP`),
 });
@@ -37,4 +38,15 @@ export const audioFiles = sqliteTable('audio_files', {
   mimeType: text('mime_type').notNull(),
   sizeBytes: integer('size_bytes').notNull(),
   createdAt: text('created_at').notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const openclawGatewayAuth = sqliteTable('openclaw_gateway_auth', {
+  role: text('role').primaryKey(),
+  deviceId: text('device_id').notNull(),
+  publicKey: text('public_key').notNull(),
+  privateKey: text('private_key').notNull(),
+  deviceToken: text('device_token'),
+  scopesJson: text('scopes_json'),
+  createdAt: text('created_at').notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: text('updated_at').notNull().default(sql`CURRENT_TIMESTAMP`),
 });

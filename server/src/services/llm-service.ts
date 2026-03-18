@@ -1,9 +1,11 @@
 import type { FastifyBaseLogger } from 'fastify';
 import type { Message } from '@tesla-openclaw/shared';
 
+import type { DatabaseClient } from '../db/client.js';
 import type { AppConfig } from '../lib/config.js';
 import { logStepFailure, logStepSuccess } from '../lib/observability.js';
 import { MockLlmProvider } from '../providers/llm/mock-provider.js';
+import { SqliteOpenClawGatewayAuthStore } from '../providers/llm/openclaw-gateway-auth-store.js';
 import { OpenClawProvider } from '../providers/llm/openclaw-provider.js';
 import { OpenAiCompatibleProvider } from '../providers/llm/openai-compatible-provider.js';
 import type { LlmProvider, LlmStreamResult } from '../providers/llm/provider.js';
@@ -12,11 +14,11 @@ export class LlmService {
   private readonly provider: LlmProvider;
   private readonly providerName: AppConfig['llmProvider'];
 
-  public constructor(config: AppConfig) {
+  public constructor(config: AppConfig, db: DatabaseClient) {
     this.providerName = config.llmProvider;
     this.provider =
       config.llmProvider === 'openclaw'
-        ? new OpenClawProvider(config)
+        ? new OpenClawProvider(config, new SqliteOpenClawGatewayAuthStore(db))
         : config.llmProvider === 'openai-compatible'
           ? new OpenAiCompatibleProvider(config)
           : new MockLlmProvider();
@@ -27,6 +29,7 @@ export class LlmService {
     requestId: string;
     text: string;
     history: Message[];
+    upstreamSessionKey?: string;
     logger?: FastifyBaseLogger | undefined;
   }): Promise<string> {
     const startedAt = Date.now();
@@ -40,6 +43,7 @@ export class LlmService {
           role: message.role,
           content: message.content,
         })),
+        ...(params.upstreamSessionKey ? { upstreamSessionKey: params.upstreamSessionKey } : {}),
       });
 
       logStepSuccess({
@@ -75,6 +79,7 @@ export class LlmService {
     requestId: string;
     text: string;
     history: Message[];
+    upstreamSessionKey?: string;
     onDelta(delta: string): Promise<void> | void;
     logger?: FastifyBaseLogger | undefined;
   }): Promise<LlmStreamResult> {
@@ -90,6 +95,7 @@ export class LlmService {
             role: message.role,
             content: message.content,
           })),
+          ...(params.upstreamSessionKey ? { upstreamSessionKey: params.upstreamSessionKey } : {}),
         },
         { onDelta: (delta) => params.onDelta(delta) },
       );
@@ -131,5 +137,15 @@ export class LlmService {
       });
       throw error;
     }
+  }
+
+  public async resetSession(params: {
+    sessionId: string;
+    upstreamSessionKey?: string;
+  }): Promise<void> {
+    await this.provider.resetSession({
+      sessionId: params.sessionId,
+      ...(params.upstreamSessionKey ? { upstreamSessionKey: params.upstreamSessionKey } : {}),
+    });
   }
 }

@@ -5,7 +5,10 @@ import { requestLogs } from '../db/schema.js';
 import { nowIso } from '../lib/utils.js';
 
 export class RequestLogService {
-  private readonly inFlightRequests = new Map<string, Promise<unknown>>();
+  private readonly inFlightRequests = new Map<string, {
+    sessionId: string;
+    promise: Promise<unknown>;
+  }>();
 
   public constructor(private readonly db: DatabaseClient) {}
 
@@ -31,16 +34,37 @@ export class RequestLogService {
     return this.inFlightRequests.has(requestId);
   }
 
-  public async runOnce<T>(requestId: string, operation: () => Promise<T>): Promise<T> {
-    const existing = this.inFlightRequests.get(requestId);
-    if (existing) {
-      return existing as Promise<T>;
+  public hasInFlightSession(sessionId: string): boolean {
+    for (const request of this.inFlightRequests.values()) {
+      if (request.sessionId === sessionId) {
+        return true;
+      }
     }
 
-    const pending = operation().finally(() => {
-      this.inFlightRequests.delete(requestId);
+    return false;
+  }
+
+  public async clearSession(sessionId: string): Promise<void> {
+    await this.db.delete(requestLogs).where(eq(requestLogs.sessionId, sessionId));
+  }
+
+  public async runOnce<T>(params: {
+    requestId: string;
+    sessionId: string;
+    operation: () => Promise<T>;
+  }): Promise<T> {
+    const existing = this.inFlightRequests.get(params.requestId);
+    if (existing) {
+      return existing.promise as Promise<T>;
+    }
+
+    const pending = params.operation().finally(() => {
+      this.inFlightRequests.delete(params.requestId);
     });
-    this.inFlightRequests.set(requestId, pending);
+    this.inFlightRequests.set(params.requestId, {
+      sessionId: params.sessionId,
+      promise: pending,
+    });
 
     return pending;
   }

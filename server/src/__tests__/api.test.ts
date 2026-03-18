@@ -1,11 +1,13 @@
 import { rmSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createApp } from '../app.js';
 
-const testDbPath = resolve(process.cwd(), 'server/data/test-openclaw-api.db');
+const currentDir = dirname(fileURLToPath(import.meta.url));
+const testDbPath = resolve(currentDir, '../../data/test-openclaw-api.db');
 
 const createRequestId = (prefix: string): string =>
   `${prefix}_${Date.now()}_${Math.random().toString(16).slice(2, 10)}`;
@@ -117,6 +119,383 @@ describe('server api', () => {
 
     const messages = await app.services.messageService.listRecent(createPayload.data.session.sessionId, 8);
     expect(messages).toHaveLength(2);
+
+    await app.close();
+  });
+
+  it('clears persisted messages and request-log results for a session context', async () => {
+    const { app } = createApp();
+
+    const createResponse = await app.inject({
+      method: 'POST',
+      url: '/api/session/create',
+      payload: {
+        device: { type: 'tesla-browser', label: 'tesla-mcu2' },
+      },
+    });
+    const createPayload = createResponse.json<{ data: { session: { sessionId: string }; sessionToken: string } }>();
+    const requestId = createRequestId('req_text');
+
+    const firstResponse = await app.inject({
+      method: 'POST',
+      url: '/api/text/input',
+      headers: {
+        authorization: `Bearer ${createPayload.data.sessionToken}`,
+      },
+      payload: {
+        sessionId: createPayload.data.session.sessionId,
+        text: '第一轮上下文',
+        requestId,
+      },
+    });
+
+    expect(firstResponse.statusCode).toBe(200);
+    expect(await app.services.requestLogService.get(requestId)).not.toBeNull();
+
+    const clearResponse = await app.inject({
+      method: 'POST',
+      url: '/api/session/clear',
+      headers: {
+        authorization: `Bearer ${createPayload.data.sessionToken}`,
+      },
+      payload: {
+        sessionId: createPayload.data.session.sessionId,
+      },
+    });
+
+    expect(clearResponse.statusCode).toBe(200);
+    expect(clearResponse.body).toContain('"cleared":true');
+    expect(await app.services.messageService.listRecent(createPayload.data.session.sessionId, 8)).toHaveLength(0);
+    expect(await app.services.requestLogService.get(requestId)).toBeNull();
+
+    const secondResponse = await app.inject({
+      method: 'POST',
+      url: '/api/text/input',
+      headers: {
+        authorization: `Bearer ${createPayload.data.sessionToken}`,
+      },
+      payload: {
+        sessionId: createPayload.data.session.sessionId,
+        text: '清除后新请求',
+        requestId,
+      },
+    });
+
+    expect(secondResponse.statusCode).toBe(200);
+    expect(await app.services.messageService.listRecent(createPayload.data.session.sessionId, 8)).toHaveLength(2);
+
+    await app.close();
+  });
+
+  it('maps a local session to a backend-owned OpenClaw session key and resets it on clear', async () => {
+    process.env.LLM_PROVIDER = 'openclaw';
+    process.env.LLM_BASE_URL = 'ws://127.0.0.1:18789';
+    process.env.LLM_API_KEY = 'gateway-token';
+    process.env.OPENCLAW_AGENT_ID = 'main';
+
+    const { app } = createApp();
+    const resetSpy = vi.spyOn(app.services.llmService, 'resetSession').mockResolvedValue();
+
+    const createResponse = await app.inject({
+      method: 'POST',
+      url: '/api/session/create',
+      payload: {
+        device: { type: 'tesla-browser', label: 'tesla-mcu2' },
+      },
+    });
+    const createPayload = createResponse.json<{ data: { session: { sessionId: string }; sessionToken: string } }>();
+    const sessionState = await app.services.sessionService.getAuthorizedSessionState(
+      createPayload.data.session.sessionId,
+      createPayload.data.sessionToken,
+    );
+
+    expect(sessionState.openclawSessionKey).toBe(`agent:main:${createPayload.data.session.sessionId}`);
+
+    const clearResponse = await app.inject({
+      method: 'POST',
+      url: '/api/session/clear',
+      headers: {
+        authorization: `Bearer ${createPayload.data.sessionToken}`,
+      },
+      payload: {
+        sessionId: createPayload.data.session.sessionId,
+      },
+    });
+
+    expect(clearResponse.statusCode).toBe(200);
+    expect(resetSpy).toHaveBeenCalledWith({
+      sessionId: createPayload.data.session.sessionId,
+      upstreamSessionKey: `agent:main:${createPayload.data.session.sessionId}`,
+    });
+
+    await app.close();
+  });
+
+  it('keeps using the mapped upstream session across re-auth, refresh recovery, retry, and post-clear sends', async () => {
+    process.env.AUTH_ENABLED = 'true';
+    process.env.AUTH_SHARED_PIN = '123456';
+    process.env.LLM_PROVIDER = 'openclaw';
+    process.env.LLM_BASE_URL = 'ws://127.0.0.1:18789';
+    process.env.LLM_API_KEY = 'gateway-token';
+    process.env.OPENCLAW_AGENT_ID = 'main';
+
+    const { app } = createApp();
+    const generateReplySpy = vi.spyOn(app.services.llmService, 'generateReply');
+    const resetSpy = vi.spyOn(app.services.llmService, 'resetSession').mockResolvedValue();
+
+    generateReplySpy.mockResolvedValue('OpenClaw test reply');
+
+    const firstUnlock = await app.inject({
+      method: 'POST',
+      url: '/api/auth/unlock',
+      payload: { pin: '123456' },
+    });
+    const firstAuthToken = firstUnlock.json<{ data: { authToken: string } }>().data.authToken;
+
+    const createResponse = await app.inject({
+      method: 'POST',
+      url: '/api/session/create',
+      headers: {
+        'x-app-auth': firstAuthToken,
+      },
+      payload: {
+        device: { type: 'tesla-browser', label: 'tesla-mcu2' },
+      },
+    });
+    const createPayload = createResponse.json<{ data: { session: { sessionId: string }; sessionToken: string } }>();
+    const sessionId = createPayload.data.session.sessionId;
+    const sessionToken = createPayload.data.sessionToken;
+    const upstreamSessionKey = `agent:main:${sessionId}`;
+
+    const firstSend = await app.inject({
+      method: 'POST',
+      url: '/api/text/input',
+      headers: {
+        authorization: `Bearer ${sessionToken}`,
+        'x-app-auth': firstAuthToken,
+      },
+      payload: {
+        sessionId,
+        text: '第一轮',
+        requestId: createRequestId('req_text'),
+      },
+    });
+    expect(firstSend.statusCode).toBe(200);
+    expect(generateReplySpy).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        sessionId,
+        upstreamSessionKey,
+      }),
+    );
+
+    const secondUnlock = await app.inject({
+      method: 'POST',
+      url: '/api/auth/unlock',
+      payload: { pin: '123456' },
+    });
+    const secondAuthToken = secondUnlock.json<{ data: { authToken: string } }>().data.authToken;
+
+    const restoreMessages = await app.inject({
+      method: 'GET',
+      url: `/api/messages?sessionId=${sessionId}&limit=8`,
+      headers: {
+        authorization: `Bearer ${sessionToken}`,
+        'x-app-auth': secondAuthToken,
+      },
+    });
+    expect(restoreMessages.statusCode).toBe(200);
+    expect(restoreMessages.body).toContain('第一轮');
+
+    const retryRequestId = createRequestId('req_retry');
+    const retriedSend = await app.inject({
+      method: 'POST',
+      url: '/api/text/input',
+      headers: {
+        authorization: `Bearer ${sessionToken}`,
+        'x-app-auth': secondAuthToken,
+      },
+      payload: {
+        sessionId,
+        text: '重试验证',
+        requestId: retryRequestId,
+      },
+    });
+    expect(retriedSend.statusCode).toBe(200);
+    expect(generateReplySpy).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        sessionId,
+        upstreamSessionKey,
+      }),
+    );
+
+    const duplicatedRetry = await app.inject({
+      method: 'POST',
+      url: '/api/text/input',
+      headers: {
+        authorization: `Bearer ${sessionToken}`,
+        'x-app-auth': secondAuthToken,
+      },
+      payload: {
+        sessionId,
+        text: '重试验证',
+        requestId: retryRequestId,
+      },
+    });
+    expect(duplicatedRetry.statusCode).toBe(200);
+    expect(generateReplySpy).toHaveBeenCalledTimes(2);
+
+    const clearResponse = await app.inject({
+      method: 'POST',
+      url: '/api/session/clear',
+      headers: {
+        authorization: `Bearer ${sessionToken}`,
+        'x-app-auth': secondAuthToken,
+      },
+      payload: {
+        sessionId,
+      },
+    });
+    expect(clearResponse.statusCode).toBe(200);
+    expect(resetSpy).toHaveBeenCalledWith({
+      sessionId,
+      upstreamSessionKey,
+    });
+
+    const postClearSend = await app.inject({
+      method: 'POST',
+      url: '/api/text/input',
+      headers: {
+        authorization: `Bearer ${sessionToken}`,
+        'x-app-auth': secondAuthToken,
+      },
+      payload: {
+        sessionId,
+        text: '清除后继续发送',
+        requestId: createRequestId('req_after_clear'),
+      },
+    });
+    expect(postClearSend.statusCode).toBe(200);
+    expect(generateReplySpy).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        sessionId,
+        upstreamSessionKey,
+      }),
+    );
+
+    await app.close();
+  });
+
+  it('returns conflict when trying to clear context while a request is still in flight', async () => {
+    const { app } = createApp();
+
+    const createResponse = await app.inject({
+      method: 'POST',
+      url: '/api/session/create',
+      payload: {
+        device: { type: 'tesla-browser', label: 'tesla-mcu2' },
+      },
+    });
+    const createPayload = createResponse.json<{ data: { session: { sessionId: string }; sessionToken: string } }>();
+
+    let release = () => {};
+    const inFlight = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+
+    void app.services.requestLogService.runOnce({
+      requestId: createRequestId('req_inflight'),
+      sessionId: createPayload.data.session.sessionId,
+      operation: async () => {
+        await inFlight;
+        return null;
+      },
+    });
+
+    const clearResponse = await app.inject({
+      method: 'POST',
+      url: '/api/session/clear',
+      headers: {
+        authorization: `Bearer ${createPayload.data.sessionToken}`,
+      },
+      payload: {
+        sessionId: createPayload.data.session.sessionId,
+      },
+    });
+
+    expect(clearResponse.statusCode).toBe(409);
+    expect(clearResponse.body).toContain('REQUEST_CONFLICT');
+
+    release();
+    await Promise.resolve();
+    await app.close();
+  });
+
+  it('returns conflict when trying to clear context after another request has locked the session', async () => {
+    const { app } = createApp();
+
+    const createResponse = await app.inject({
+      method: 'POST',
+      url: '/api/session/create',
+      payload: {
+        device: { type: 'tesla-browser', label: 'tesla-mcu2' },
+      },
+    });
+    const createPayload = createResponse.json<{ data: { session: { sessionId: string }; sessionToken: string } }>();
+
+    await app.services.sessionService.acquireAuthorizedBusySession(
+      createPayload.data.session.sessionId,
+      createPayload.data.sessionToken,
+    );
+
+    const clearResponse = await app.inject({
+      method: 'POST',
+      url: '/api/session/clear',
+      headers: {
+        authorization: `Bearer ${createPayload.data.sessionToken}`,
+      },
+      payload: {
+        sessionId: createPayload.data.session.sessionId,
+      },
+    });
+
+    expect(clearResponse.statusCode).toBe(409);
+    expect(clearResponse.body).toContain('REQUEST_CONFLICT');
+
+    await app.close();
+  });
+
+  it('returns conflict instead of writing messages when the session is already locked', async () => {
+    const { app } = createApp();
+
+    const createResponse = await app.inject({
+      method: 'POST',
+      url: '/api/session/create',
+      payload: {
+        device: { type: 'tesla-browser', label: 'tesla-mcu2' },
+      },
+    });
+    const createPayload = createResponse.json<{ data: { session: { sessionId: string }; sessionToken: string } }>();
+
+    await app.services.sessionService.acquireAuthorizedBusySession(
+      createPayload.data.session.sessionId,
+      createPayload.data.sessionToken,
+    );
+
+    const textResponse = await app.inject({
+      method: 'POST',
+      url: '/api/text/input',
+      headers: {
+        authorization: `Bearer ${createPayload.data.sessionToken}`,
+      },
+      payload: {
+        sessionId: createPayload.data.session.sessionId,
+        text: '不应该写入',
+        requestId: createRequestId('req_busy'),
+      },
+    });
+
+    expect(textResponse.statusCode).toBe(409);
+    expect(await app.services.messageService.listRecent(createPayload.data.session.sessionId, 8)).toHaveLength(0);
 
     await app.close();
   });

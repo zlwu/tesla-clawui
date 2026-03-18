@@ -73,6 +73,15 @@ export const createSessionResponseSchema = z.object({
   sessionToken: z.string(),
 });
 
+export const clearSessionContextRequestSchema = z.object({
+  sessionId: z.string(),
+});
+
+export const clearSessionContextResponseSchema = z.object({
+  sessionId: z.string(),
+  cleared: z.literal(true),
+});
+
 export const authConfigResponseSchema = z.object({
   enabled: z.boolean(),
   pinLength: z.number().int().min(4).max(12),
@@ -92,6 +101,7 @@ export const textInputRequestSchema = z.object({
   sessionId: z.string(),
   text: z.string().trim().min(1).max(4000),
   requestId: z.string().trim().min(1).max(128),
+  openclawSessionKey: z.string().trim().min(1).max(128).optional(),
 });
 
 export const textInputResponseSchema = z.object({

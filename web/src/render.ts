@@ -2,7 +2,6 @@ import type { Message } from '@tesla-openclaw/shared';
 
 import type { AppState } from './state.js';
 import { renderMarkdown, renderPlainText } from './render-markdown.js';
-import { statusLabelMap } from './state-machine.js';
 import { getComposerStatusView, getWaitingIndicatorText } from './ui-state.js';
 
 type MessageRefs = {
@@ -17,9 +16,14 @@ type DomRefs = {
   authNetwork: HTMLElement;
   authError: HTMLElement;
   chatShell: HTMLElement;
-  statusText: HTMLElement;
-  networkText: HTMLElement;
+  statusIndicator: HTMLElement;
+  statusDot: HTMLElement;
+  statusLabel: HTMLElement;
   themeToggleButton: HTMLButtonElement;
+  headerMenuButton: HTMLButtonElement;
+  headerMenu: HTMLElement;
+  clearContextButton: HTMLButtonElement;
+  clearContextError: HTMLElement;
   messages: HTMLElement;
   emptyState: HTMLElement;
   backToBottomButton: HTMLButtonElement;
@@ -119,6 +123,37 @@ const backToBottomIcon = () => `
     />
   </svg>
 `;
+
+const menuIcon = () => `
+  <svg viewBox="0 0 20 20" aria-hidden="true" class="button-icon">
+    <circle cx="10" cy="4" r="1.5" fill="currentColor" />
+    <circle cx="10" cy="10" r="1.5" fill="currentColor" />
+    <circle cx="10" cy="16" r="1.5" fill="currentColor" />
+  </svg>
+`;
+
+const getHeaderStatusView = (state: AppState): {
+  text: string;
+  tone: 'online' | 'busy' | 'error' | 'offline';
+} => {
+  if (!state.networkOnline) {
+    return { text: '离线', tone: 'offline' };
+  }
+
+  if (state.status === 'error') {
+    return { text: '异常', tone: 'error' };
+  }
+
+  if (state.responsePhase === 'waiting') {
+    return { text: '等待', tone: 'busy' };
+  }
+
+  if (state.responsePhase === 'streaming') {
+    return { text: '回复中', tone: 'busy' };
+  }
+
+  return { text: '在线', tone: 'online' };
+};
 
 const createElement = <K extends keyof HTMLElementTagNameMap>(
   tagName: K,
@@ -240,15 +275,30 @@ const createAuthShell = () => {
 const createChatShell = () => {
   const chatShell = createElement('main', { className: 'shell' });
   const header = createElement('header', { className: 'app-header' });
+  const titleWrap = createElement('div', { className: 'app-title-wrap' });
   const title = createElement('h1', { className: 'app-title', textContent: 'OpenClaw' });
   const statusBar = createElement('div', { className: 'status-bar' });
-  const statusText = createElement('div', { className: 'status-pill' });
-  const networkText = createElement('div', { className: 'status-pill' });
+  const statusIndicator = createElement('div', { className: 'status-indicator' });
+  const statusDot = createElement('span', { className: 'status-dot' });
+  const statusLabel = createElement('span', { className: 'status-label' });
+  statusIndicator.append(statusDot, statusLabel);
+  titleWrap.append(title);
   const themeToggleButton = createElement('button', { className: 'icon-button theme-toggle-button' });
   themeToggleButton.id = 'theme-toggle-button';
   themeToggleButton.type = 'button';
-  statusBar.append(statusText, networkText, themeToggleButton);
-  header.append(title, statusBar);
+  const menuWrap = createElement('div', { className: 'header-menu-wrap' });
+  const headerMenuButton = createElement('button', { className: 'icon-button header-menu-button' });
+  headerMenuButton.id = 'header-menu-button';
+  headerMenuButton.type = 'button';
+  const headerMenu = createElement('div', { className: 'header-menu' });
+  const clearContextButton = createElement('button', { className: 'header-menu-item' });
+  clearContextButton.id = 'clear-context-button';
+  clearContextButton.type = 'button';
+  const clearContextError = createElement('div', { className: 'header-menu-error error-text' });
+  headerMenu.append(clearContextButton, clearContextError);
+  menuWrap.append(headerMenuButton, headerMenu);
+  statusBar.append(statusIndicator, themeToggleButton, menuWrap);
+  header.append(titleWrap, statusBar);
 
   const messages = createElement('section', { className: 'messages' });
   messages.setAttribute('aria-live', 'polite');
@@ -288,9 +338,14 @@ const createChatShell = () => {
 
   return {
     chatShell,
-    statusText,
-    networkText,
+    statusIndicator,
+    statusDot,
+    statusLabel,
     themeToggleButton,
+    headerMenuButton,
+    headerMenu,
+    clearContextButton,
+    clearContextError,
     messages,
     emptyState,
     backToBottomButton,
@@ -370,9 +425,11 @@ const syncMessages = (refs: DomRefs, state: AppState): void => {
 
 const syncChatState = (refs: DomRefs, state: AppState): void => {
   const composerStatus = getComposerStatusView(state);
-
-  refs.statusText.textContent = `状态：${statusLabelMap[state.status]}`;
-  refs.networkText.textContent = state.networkOnline ? '网络在线' : '网络离线';
+  const headerStatus = getHeaderStatusView(state);
+  refs.statusLabel.textContent = headerStatus.text;
+  refs.statusIndicator.className = `status-indicator status-indicator-${headerStatus.tone}`;
+  refs.statusIndicator.setAttribute('aria-label', `当前状态：${headerStatus.text}`);
+  refs.statusIndicator.title = `当前状态：${headerStatus.text}`;
 
   const themeLabelMap = { auto: '跟随系统', light: '白天模式', dark: '夜晚模式' } as const;
   const themeLabel = themeLabelMap[state.theme];
@@ -383,6 +440,20 @@ const syncChatState = (refs: DomRefs, state: AppState): void => {
   }
   refs.themeToggleButton.setAttribute('aria-label', themeLabel);
   refs.themeToggleButton.title = themeLabel;
+  refs.headerMenuButton.innerHTML = menuIcon();
+  refs.headerMenuButton.setAttribute('aria-label', state.isHeaderMenuOpen ? '收起更多操作' : '更多操作');
+  refs.headerMenuButton.title = state.isHeaderMenuOpen ? '收起更多操作' : '更多操作';
+  refs.headerMenu.classList.toggle('header-menu-open', state.isHeaderMenuOpen);
+  refs.headerMenu.setAttribute('aria-hidden', String(!state.isHeaderMenuOpen));
+
+  const canClearContext = state.messages.length > 0 && state.responsePhase === 'idle' && !state.isClearingContext;
+  refs.clearContextButton.textContent = '清除上下文';
+  refs.clearContextButton.disabled = !canClearContext;
+  refs.clearContextButton.hidden = state.messages.length === 0;
+  refs.clearContextButton.title = canClearContext ? '清除当前对话上下文' : '当前没有可清除内容，或请等待回复结束';
+  refs.clearContextError.textContent = state.clearContextError ?? '';
+  setHidden(refs.clearContextError, !state.clearContextError);
+  refs.clearContextButton.textContent = state.isClearingContext ? '清除中…' : '清除上下文';
 
   refs.textarea.placeholder = inputHintText();
   refs.textarea.disabled = false;

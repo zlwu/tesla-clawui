@@ -29,9 +29,10 @@
 
 - 本地浏览器验证已通过：页面加载、文本发送、刷新恢复、弱网手动重试
 - 真实 provider 联调已通过：`OpenClaw Gateway LLM`
-- 本地 OpenClaw Gateway HTTP chat endpoint 已完成真实 `/api/text/input` 联调
+- 本地 OpenClaw Gateway 原生 chat/session 已完成真实 `/api/text/input` 联调
 - 文本主链路已支持 SSE streaming，assistant 回复可边输出边显示
 - 服务端已校验上游流式 completion 信号，只有明确完成的回复才会落库并返回 `done`
+- 当前聊天页已支持从右上角 `...` 菜单手动清除当前会话上下文；该能力会同时清空服务端 session 消息历史与本地最近消息缓存
 - assistant 消息已支持受控 Markdown 子集渲染：标题、列表、引用、粗体、行内代码、代码块
 - 消息区与输入区布局已收口为真实占位底栏；初始进入和流式输出默认定位到最新消息
 - 已支持基于 `.env` 的 shared PIN 门禁，解锁后再进入当前 Tesla 会话
@@ -45,6 +46,7 @@
 - 当前输入区已收口为：单一 composer、右侧发送按钮、系统语音输入提示
 - 当前消息滚动策略已收口为：初始定位到底部、streaming 默认跟随、用户手动上滑后停止强制跟随
 - 当前主界面交互已收口为：发送后分离“等待首包”和“正在回复”两段状态，等待首包使用轻量 ASCII 点动画提示
+- 当前顶栏交互已收口为：轻量状态提示、主题按钮和 `...` 折叠菜单；`清除上下文` 仍基于 Tesla 单会话文本主链路，不扩展为多会话管理
 - 当前 Tesla / iOS 键盘避让策略已收口为：优先吃 layout viewport resize，其次 `visualViewport`，最后才退回 focus 驱动保守底部留白
 - 当前渲染层已切到稳定 DOM 壳体 + 局部 patch，以保住焦点、滚动和 streaming 期间的节点稳定性
 - 若出现“回复说到一半停止但车机端无浏览器日志”的排障场景，当前应优先查看后端结构化日志中的上游流 completion 诊断字段
@@ -64,7 +66,9 @@
 - `npm run lint`：执行 ESLint
 - `npm run typecheck`：执行 TypeScript 严格检查
 - `npm run test`：执行 Vitest
+- `npm run smoke:openclaw:gateway`：直接对 OpenClaw Gateway 做一次原生 WebSocket 探针
 - `npm run smoke:openclaw`：对当前运行中的服务执行一次 OpenClaw 文本主链路冒烟
+- `npm run smoke:clear-context`：验证清除上下文后，同一个本地 session 的上游 Gateway 记忆已被重置
 - `openspec list --specs`：查看当前 OpenSpec capability 基线
 - `openspec validate --specs`：校验 OpenSpec 基线结构
 
@@ -77,6 +81,7 @@
 - 如需启用 shared PIN 门禁，可设置 `AUTH_ENABLED=true`、`AUTH_SHARED_PIN=6位数字PIN`
 - 当前推荐 LLM 配置为 `LLM_PROVIDER=openclaw`
 - OpenClaw 使用 `LLM_BASE_URL`、`LLM_API_KEY`、`LLM_MODEL`，可选 `OPENCLAW_AGENT_ID`
+- 本地新基线推荐把 `LLM_BASE_URL` 直接设为 Gateway WebSocket 地址，例如 `ws://127.0.0.1:18789`
 
 ## 运行步骤
 
@@ -101,12 +106,31 @@
 6. 相同 `requestId` 不会重复生成多份回复
 
 真机实测请直接使用 `docs/tesla-openclaw-smoke-checklist.md`。
+本地原生 Gateway 调试基线见 `docs/tesla-openclaw-openclaw-native-dev.md`。
+
+如需先绕过 App Server 直连验证 Gateway 本身，可执行：
+
+```bash
+npm run smoke:openclaw:gateway
+```
 
 本地 OpenClaw 文本主链路可执行：
 
 ```bash
 npm run smoke:openclaw
 ```
+
+如需验证“清除上下文”是否真的重置了同一个 Tesla session 背后的上游 Gateway 会话，可执行：
+
+```bash
+npm run smoke:clear-context
+```
+
+这个脚本会在同一个本地 session 下连续发送多次请求：
+- 先确认 agent 仍能稳定回答自己的固定身份
+- 再在同一个 Tesla session 背后的上游 Gateway session 中写入一条临时暗号并验证它确实记住了
+- 中间调用一次 `/api/session/clear`
+- 清除后继续在同一个本地 Tesla session 下发送，验证 agent 身份仍保留，但刚才那条临时暗号记忆不再存在
 
 可选环境变量：
 
@@ -120,6 +144,7 @@ npm run smoke:openclaw
 - 用户发送消息后，界面先进入“等待首包”状态；assistant 占位区显示 `正在等待回复.` / `..` / `...` 的轻量 ASCII 点轮替。
 - 收到第一个流式文本增量后，等待提示立即停止，真实回复文本接管消息区；composer 保持安静，只承担输入与发送动作本身。
 - 流式回复期间 textarea 保持可编辑，但发送动作会继续门禁，直到当前回复结束或失败。
+- 当前会话如需重新开始，可从右上角 `...` 菜单选择 `清除上下文`；成功后刷新或重新进入同一 session 也不会恢复已清除历史。
 
 ## 手工验证清单
 
@@ -153,7 +178,10 @@ npm run smoke:openclaw
 
 - 当前仓库默认按本地 OpenClaw Gateway 联调
 - 将 `LLM_PROVIDER` 设为 `openclaw`
-- 将 `LLM_BASE_URL` 设为 OpenClaw Gateway 的 `/v1/chat/completions`
+- 将 `LLM_BASE_URL` 设为 OpenClaw Gateway 的 WebSocket 根地址，例如 `ws://127.0.0.1:18789`
 - 将 `LLM_API_KEY` 设为 Gateway token 或 password 对应 bearer token
 - 将 `LLM_MODEL` 设为 `openclaw` 或 `openclaw:<agentId>`
 - 如需固定 agent，也可设置 `OPENCLAW_AGENT_ID`，服务端会自动把它编码到 `LLM_MODEL`
+- 当前 OpenClaw 路径默认依赖 agent 自身的人设与系统设定；服务端不会再额外注入一层通用 `system prompt` 去覆盖它
+- 当前 OpenClaw 路径的会话记忆默认交给 Gateway session 管理；服务端会把本地 Tesla session 映射到固定的上游 `sessionKey`，前端不再直接持有或传递 `openclawSessionKey`
+- 当前实现通过原生 `connect` / `chat.send` / `sessions.reset` 与 Gateway 交互，再由服务端把原生 `chat` 事件桥接回现有 SSE `start` / `delta` / `done` 协议

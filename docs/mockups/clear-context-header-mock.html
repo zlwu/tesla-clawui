@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OpenClaw Header Mock</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #1a1a1e;
+        --surface: #2a2a2e;
+        --surface-alt: #232326;
+        --text: #ececf1;
+        --text-2: #a3a3b2;
+        --border: #363640;
+        --shadow: rgba(0, 0, 0, 0.3);
+        --good: #57c084;
+        --busy: #f3b649;
+        --danger: #ea6a6a;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background:
+          radial-gradient(circle at top, rgba(255, 255, 255, 0.05), transparent 28%),
+          linear-gradient(180deg, #1d1d22 0%, #17171b 100%);
+        color: var(--text);
+        font-family:
+          ui-sans-serif,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+      }
+
+      .frame {
+        width: min(100%, 980px);
+        min-height: 100vh;
+        margin: 0 auto;
+        padding: 18px 16px 24px;
+        display: grid;
+        gap: 12px;
+        grid-template-rows: auto minmax(0, 1fr) auto;
+      }
+
+      .header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .title-block {
+        min-width: 0;
+      }
+
+      .title {
+        margin: 0;
+        font-size: clamp(26px, 3vw, 32px);
+        font-weight: 700;
+        letter-spacing: -0.03em;
+      }
+
+      .subtitle {
+        margin: 4px 0 0;
+        color: var(--text-2);
+        font-size: 13px;
+      }
+
+      .header-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-shrink: 0;
+      }
+
+      .status-compact {
+        min-width: 108px;
+        height: 42px;
+        padding: 0 12px;
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        background: rgba(42, 42, 46, 0.88);
+        box-shadow: 0 8px 24px var(--shadow);
+        display: inline-flex;
+        align-items: center;
+        gap: 9px;
+      }
+
+      .status-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 999px;
+        background: var(--good);
+        box-shadow: 0 0 0 4px rgba(87, 192, 132, 0.15);
+        flex-shrink: 0;
+      }
+
+      .status-text {
+        font-size: 14px;
+        color: var(--text);
+        white-space: nowrap;
+      }
+
+      .icon-button {
+        width: 42px;
+        height: 42px;
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        background: rgba(42, 42, 46, 0.88);
+        color: var(--text);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 8px 24px var(--shadow);
+      }
+
+      .icon-button svg {
+        width: 18px;
+        height: 18px;
+      }
+
+      .clear-button {
+        color: #f1c8c8;
+      }
+
+      .messages {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        min-height: 0;
+      }
+
+      .message {
+        width: min(100%, 860px);
+        padding: 18px 18px 20px;
+        border-radius: 22px;
+        display: grid;
+        grid-template-columns: 44px minmax(0, 1fr);
+        gap: 14px;
+      }
+
+      .message.assistant {
+        background: var(--surface);
+      }
+
+      .message.user {
+        background: var(--surface-alt);
+        justify-self: end;
+      }
+
+      .avatar {
+        width: 44px;
+        height: 44px;
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.08);
+        color: var(--text-2);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      .content {
+        font-size: 21px;
+        line-height: 1.52;
+      }
+
+      .mock-note {
+        width: min(100%, 860px);
+        padding: 14px 16px;
+        border: 1px dashed var(--border);
+        border-radius: 18px;
+        color: var(--text-2);
+        font-size: 14px;
+        line-height: 1.45;
+      }
+
+      .composer {
+        padding: 14px;
+        border: 1px solid var(--border);
+        border-radius: 24px;
+        background: rgba(42, 42, 46, 0.92);
+        box-shadow: 0 12px 28px var(--shadow);
+        display: grid;
+        gap: 10px;
+      }
+
+      .composer-input {
+        min-height: 88px;
+        padding: 16px 18px;
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        color: var(--text-2);
+        font-size: 22px;
+        background: rgba(255, 255, 255, 0.02);
+      }
+
+      .composer-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .composer-hint {
+        color: var(--text-2);
+        font-size: 14px;
+      }
+
+      .send {
+        width: 58px;
+        height: 58px;
+        border-radius: 18px;
+        border: none;
+        background: #f0f0f5;
+        color: #1d1d22;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .legend {
+        width: min(100%, 860px);
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .chip {
+        padding: 7px 10px;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        color: var(--text-2);
+        font-size: 13px;
+      }
+
+      @media (max-width: 760px) {
+        .header {
+          align-items: stretch;
+          flex-direction: column;
+        }
+
+        .header-actions {
+          justify-content: flex-end;
+        }
+
+        .status-compact {
+          min-width: 0;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="frame">
+      <header class="header">
+        <div class="title-block">
+          <h1 class="title">OpenClaw</h1>
+          <p class="subtitle">顶栏状态收成一个紧凑指示器，给清除按钮留出空间</p>
+        </div>
+
+        <div class="header-actions">
+          <div class="status-compact" aria-label="当前状态：在线">
+            <span class="status-dot"></span>
+            <span class="status-text">在线</span>
+          </div>
+
+          <button class="icon-button clear-button" aria-label="清除上下文" title="清除上下文">
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M4.8 6.2h10.4"></path>
+              <path d="M7.3 6.2V5.1c0-.6.4-1 1-1h3.4c.6 0 1 .4 1 1v1.1"></path>
+              <path d="M6.2 6.2l.6 8.1c0 .9.4 1.6 1.3 1.6h3.8c.9 0 1.3-.7 1.3-1.6l.6-8.1"></path>
+              <path d="M8.6 8.7v4.4M11.4 8.7v4.4"></path>
+            </svg>
+          </button>
+
+          <button class="icon-button" aria-label="切换主题" title="切换主题">
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true">
+              <circle cx="10" cy="10" r="3"></circle>
+              <path d="M10 4.5V3.5M10 16.5V15.5M4.5 10H3.5M16.5 10H15.5M6.04 6.04L5.33 5.33M14.67 14.67L13.96 13.96M13.96 6.04L14.67 5.33M5.33 14.67L6.04 13.96"></path>
+            </svg>
+          </button>
+        </div>
+      </header>
+
+      <section class="messages">
+        <div class="mock-note">
+          这个 mock 只表达布局方向：状态压缩为单个紧凑控件，清除动作提升到顶栏右侧，composer 保持干净，不把破坏性操作塞进发送区。
+        </div>
+
+        <article class="message assistant">
+          <div class="avatar">OC</div>
+          <div class="content">可以的。切换话题时你可以直接清除之前的对话上下文，再从一个空会话继续。</div>
+        </article>
+
+        <article class="message user">
+          <div class="avatar">你</div>
+          <div class="content">我想确认一下，新按钮放在右上角会不会太挤？</div>
+        </article>
+
+        <div class="legend">
+          <div class="chip">状态：绿点 + 在线</div>
+          <div class="chip">清除：垃圾桶图标，低频破坏性动作</div>
+          <div class="chip">主题：保留图标按钮</div>
+        </div>
+      </section>
+
+      <section class="composer">
+        <div class="composer-input">给 OpenClaw 发消息，Tesla 真机请使用系统语音输入后发送</div>
+        <div class="composer-row">
+          <div class="composer-hint">主发送区不承载“清除上下文”这类破坏性操作</div>
+          <button class="send" aria-label="发送">
+            <svg viewBox="0 0 20 20" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M10 15.2V5.4"></path>
+              <path d="M5.9 8.5 10 4.4l4.1 4.1"></path>
+            </svg>
+          </button>
+        </div>
+      </section>
+    </main>
+  </body>
+  </html>
